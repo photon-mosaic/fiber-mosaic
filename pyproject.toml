@@ -1,0 +1,108 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fiber-mosaic"
+description = ""
+license = {text = "MIT"}
+requires-python = ">=3.12"
+authors = [
+    {name = "Allen Institute for Neural Dynamics"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3"
+]
+readme = "README.md"
+dynamic = ["version"]
+
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    'black',
+    'coverage',
+    'furo',
+    'interrogate',
+    'pytest',
+    'pytest-cov',
+    'ruff',
+    'Sphinx'
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "fiber_mosaic.__version__"}
+
+[tool.black]
+line-length = 79
+target_version = ['py312']
+exclude = '''
+
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | build
+    | dist
+  )/
+  | .gitignore
+)
+'''
+
+[tool.ruff]
+line-length = 79
+target-version = "py312"
+exclude = [
+    ".eggs",
+    ".git",
+    ".mypy_cache",
+    ".tox",
+    ".venv",
+    "_build",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+# E/W: pycodestyle, F: pyflakes, I: isort, B: flake8-bugbear,
+# C90: mccabe complexity, D: pydocstyle, UP: pyupgrade.
+select = ["E", "W", "F", "I", "B", "C90", "D", "UP"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=fiber_mosaic --cov-report=term-missing"
+
+[tool.coverage.run]
+omit = ["*__init__*"]
+source = ["fiber_mosaic", "tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if __name__ == .__main__.:",
+    "from",
+    "import",
+    "pragma: no cover"
+]
+fail_under = 100
+
+[tool.interrogate]
+exclude = ["setup.py", "docs", "build"]
+fail-under = 100
