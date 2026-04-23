@@ -4,8 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fiber-mosaic"
-description = ""
-license = {text = "MIT"}
+description = "Library to extract and process fiber photometry data"
 requires-python = ">=3.12"
 authors = [
     {name = "Allen Institute for Neural Dynamics"}

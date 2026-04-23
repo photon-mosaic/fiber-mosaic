@@ -135,5 +135,8 @@ dmypy.json
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
+# VSCode
+.vscode/
+
 # MacOs
 **/.DS_Store
