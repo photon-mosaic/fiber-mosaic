@@ -1,6 +1,6 @@
 __version__ = "0.0.0"
 
-from .base import (
+from .core.base import (
     BaseFiberPhotometryExtractor,
     BaseFiberPhotometrySegment,
     FiberPhotometryRecordingGroup,
