@@ -1,1 +1,1 @@
-"""initialize tests"""
+"""initialize tests."""
