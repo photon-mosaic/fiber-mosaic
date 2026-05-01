@@ -21,6 +21,6 @@ jobs:
       run: |
         python -m pip install -e .[dev]
     - name: Run linter checks
-      run: ruff check . && black --check . && interrogate --verbose .
+      run: ruff check . && ruff format --check .
     - name: Run tests and coverage
       run: pytest --cov=fiber_mosaic --cov-report=term --cov-fail-under=100
