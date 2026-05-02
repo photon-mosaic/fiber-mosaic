@@ -5,9 +5,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from fiber_mosaic.core.base import (BaseFiberPhotometryExtractor,
-                                    BaseFiberPhotometrySegment,
-                                    FiberPhotometryRecordingGroup)
+from fiber_mosaic.core.base import (
+    BaseFiberPhotometryExtractor,
+    BaseFiberPhotometrySegment,
+    FiberPhotometryRecordingGroup,
+)
 
 
 class _ArraySegment(BaseFiberPhotometrySegment):
