@@ -64,6 +64,10 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         """Return the number of fibers (channels) in this recording."""
         return self.get_num_channels()
 
+    def add_segment(self, segment: BaseRecordingSegment) -> None:
+        """Attach a contiguous block of fluorescence data to this recording."""
+        self.add_recording_segment(segment)
+
     def get_fluorescence(
         self,
         segment_index: int | None = None,
