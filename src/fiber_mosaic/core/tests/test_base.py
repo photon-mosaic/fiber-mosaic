@@ -7,34 +7,9 @@ import pytest
 
 from fiber_mosaic.core.base import (
     BaseFiberPhotometryExtractor,
-    BaseFiberPhotometrySegment,
     FiberPhotometryRecordingGroup,
 )
-
-
-class _ArraySegment(BaseFiberPhotometrySegment):
-    """Minimal in-memory segment used to drive tests."""
-
-    def __init__(self, traces: np.ndarray, sampling_frequency: float) -> None:
-        """Wrap a 2D ``(n_samples, n_fibers)`` numpy array."""
-        super().__init__(sampling_frequency=sampling_frequency)
-        self._traces = traces
-
-    def get_traces(
-        self,
-        start_frame: int | None = None,
-        end_frame: int | None = None,
-        channel_indices: list | np.ndarray | None = None,
-    ) -> np.ndarray:
-        """Return an optionally sliced view of the backing array."""
-        traces = self._traces[start_frame:end_frame]
-        if channel_indices is not None:
-            traces = traces[:, channel_indices]
-        return traces
-
-    def get_num_samples(self) -> int:
-        """Return the number of time samples in the backing array."""
-        return self._traces.shape[0]
+from fiber_mosaic.core.numpysegments import NumpyFiberPhotometrySegment
 
 
 def _make_recording(
@@ -56,7 +31,9 @@ def _make_recording(
         n_samples, n_fibers
     )
     rec.add_segment(
-        _ArraySegment(traces=traces, sampling_frequency=sampling_frequency)
+        NumpyFiberPhotometrySegment(
+            traces=traces, sampling_frequency=sampling_frequency
+        )
     )
     return rec, traces
 
@@ -71,7 +48,10 @@ def recording():
 def segment():
     """10x2 ramp segment reused across segment tests."""
     traces = np.arange(20, dtype="float32").reshape(10, 2)
-    return _ArraySegment(traces=traces, sampling_frequency=100.0), traces
+    seg = NumpyFiberPhotometrySegment(
+        traces=traces, sampling_frequency=100.0
+    )
+    return seg, traces
 
 
 @pytest.fixture
@@ -149,13 +129,13 @@ def test_multi_segment():
         dtype="float32",
     )
     rec.add_segment(
-        _ArraySegment(
+        NumpyFiberPhotometrySegment(
             traces=np.zeros((4, 2), dtype="float32"),
             sampling_frequency=100.0,
         )
     )
     rec.add_segment(
-        _ArraySegment(
+        NumpyFiberPhotometrySegment(
             traces=np.ones((6, 2), dtype="float32"),
             sampling_frequency=100.0,
         )
@@ -163,6 +143,129 @@ def test_multi_segment():
     assert rec.get_num_segments() == 2
     assert rec.get_fluorescence(segment_index=0).shape == (4, 2)
     assert rec.get_fluorescence(segment_index=1).shape == (6, 2)
+
+
+# ---------------- per-fiber times & streams ----------------
+
+
+def test_get_streams_not_implemented():
+    """Base extractor reads no file format, so get_streams is abstract."""
+    with pytest.raises(NotImplementedError):
+        BaseFiberPhotometryExtractor.get_streams("any-source")
+
+
+def test_set_times_per_fiber_2d(recording):
+    """A 2-D (n_samples, n_fibers) array is stored as per-fiber times."""
+    rec, traces = recording
+    n_samples, n_fibers = traces.shape
+    times = np.arange(
+        n_samples * n_fibers, dtype="float64"
+    ).reshape(n_samples, n_fibers)
+    times = times / 1000.0
+
+    assert not rec.has_fiber_times()
+    rec.set_times(times)
+    assert rec.has_fiber_times()
+    np.testing.assert_array_equal(rec.get_fiber_times(), times)
+
+
+def test_set_times_1d_broadcasts_to_all_fibers(recording):
+    """A 1-D vector is applied identically to every fiber."""
+    rec, traces = recording
+    n_samples, n_fibers = traces.shape
+    times = np.linspace(0.0, 1.0, n_samples)
+
+    rec.set_times(times)
+    fiber_times = rec.get_fiber_times()
+
+    assert fiber_times.shape == (n_samples, n_fibers)
+    for fiber in range(n_fibers):
+        np.testing.assert_array_equal(fiber_times[:, fiber], times)
+
+
+def test_get_fiber_times_default_uses_sampling_frequency(recording):
+    """Without set_times, times are synthesized from the sample rate."""
+    rec, traces = recording
+    n_samples, n_fibers = traces.shape
+    expected = np.arange(n_samples) / rec.get_sampling_frequency()
+
+    fiber_times = rec.get_fiber_times()
+
+    assert not rec.has_fiber_times()
+    assert fiber_times.shape == (n_samples, n_fibers)
+    for fiber in range(n_fibers):
+        np.testing.assert_allclose(fiber_times[:, fiber], expected)
+
+
+def test_get_fiber_times_frame_and_fiber_subset(recording):
+    """start/end frame slice rows; fiber_ids selects columns."""
+    rec, _ = recording
+    n_samples = rec.get_num_samples()
+    n_fibers = rec.get_num_fibers()
+    times = np.arange(
+        n_samples * n_fibers, dtype="float64"
+    ).reshape(n_samples, n_fibers)
+    rec.set_times(times)
+
+    np.testing.assert_array_equal(
+        rec.get_fiber_times(
+            start_frame=2, end_frame=5, fiber_ids=["f0", "f2"]
+        ),
+        times[2:5][:, [0, 2]],
+    )
+
+
+def test_set_times_wrong_1d_length_raises(recording):
+    """A 1-D vector whose length != n_samples is rejected."""
+    rec, _ = recording
+    with pytest.raises(ValueError):
+        rec.set_times(np.zeros(rec.get_num_samples() + 1))
+
+
+def test_set_times_wrong_2d_shape_raises(recording):
+    """A 2-D array not matching (n_samples, n_fibers) is rejected."""
+    rec, _ = recording
+    bad = np.zeros((rec.get_num_samples(), rec.get_num_fibers() + 1))
+    with pytest.raises(ValueError):
+        rec.set_times(bad)
+
+
+def test_set_times_wrong_ndim_raises(recording):
+    """Times with more than two dimensions are rejected."""
+    rec, _ = recording
+    bad = np.zeros((rec.get_num_samples(), rec.get_num_fibers(), 1))
+    with pytest.raises(ValueError):
+        rec.set_times(bad)
+
+
+def test_set_times_multi_segment():
+    """Per-fiber times are stored independently per segment."""
+    rec = BaseFiberPhotometryExtractor(
+        sampling_frequency=100.0,
+        fiber_ids=["f0", "f1"],
+        color="red",
+        dtype="float32",
+    )
+    rec.add_segment(
+        NumpyFiberPhotometrySegment(
+            traces=np.zeros((4, 2), dtype="float32"),
+            sampling_frequency=100.0,
+        )
+    )
+    rec.add_segment(
+        NumpyFiberPhotometrySegment(
+            traces=np.ones((6, 2), dtype="float32"),
+            sampling_frequency=100.0,
+        )
+    )
+    t0 = np.zeros((4, 2), dtype="float64")
+    t1 = np.ones((6, 2), dtype="float64")
+    rec.set_times(t0, segment_index=0)
+    rec.set_times(t1, segment_index=1)
+
+    assert rec.has_fiber_times(segment_index=0)
+    np.testing.assert_array_equal(rec.get_fiber_times(segment_index=0), t0)
+    np.testing.assert_array_equal(rec.get_fiber_times(segment_index=1), t1)
 
 
 # ---------------- BaseFiberPhotometrySegment ----------------
@@ -190,6 +293,15 @@ def test_segment_get_fluorescence_full_matches_get_traces(segment):
     """No-arg fluorescence equals no-arg get_traces on a segment."""
     seg, _ = segment
     np.testing.assert_array_equal(seg.get_fluorescence(), seg.get_traces())
+
+
+def test_numpy_segment_requires_2d_traces():
+    """A non-2-D traces array is rejected at construction."""
+    with pytest.raises(ValueError):
+        NumpyFiberPhotometrySegment(
+            traces=np.zeros(10, dtype="float32"),
+            sampling_frequency=100.0,
+        )
 
 
 # ---------------- FiberPhotometryRecordingGroup ----------------

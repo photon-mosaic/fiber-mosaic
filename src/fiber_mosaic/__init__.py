@@ -7,9 +7,11 @@ from .core.base import (
     BaseFiberPhotometrySegment,
     FiberPhotometryRecordingGroup,
 )
+from .core.numpysegments import NumpyFiberPhotometrySegment
 
 __all__ = [
     "BaseFiberPhotometryExtractor",
     "BaseFiberPhotometrySegment",
     "FiberPhotometryRecordingGroup",
+    "NumpyFiberPhotometrySegment",
 ]
