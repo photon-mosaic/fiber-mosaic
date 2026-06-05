@@ -212,7 +212,7 @@ class FiberPhotometryRecordingGroup:
         self._recordings: dict[str, BaseRecording] = dict(recordings)
 
         fiber_sets = {
-            color: tuple(rec.get_channel_ids())
+            color: tuple(rec.get_fiber_ids())
             for color, rec in self._recordings.items()
         }
         unique = set(fiber_sets.values())
