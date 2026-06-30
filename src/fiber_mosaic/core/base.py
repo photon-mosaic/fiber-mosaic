@@ -199,7 +199,7 @@ class FiberPhotometryRecordingGroup:
 
     Parameters
     ----------
-    recordings : dict[str, BaseRecording]
+    recordings : dict[str, BaseFiberPhotometryExtractor]
         Mapping from color to per-color recording. All recordings must share
         the same ``channel_ids`` (fiber IDs) in the same order.
     """
