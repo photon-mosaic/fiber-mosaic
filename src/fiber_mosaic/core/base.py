@@ -5,10 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 
 import numpy as np
-from spikeinterface.core.baserecording import (
-    BaseRecording,
-    BaseRecordingSegment,
-)
+from spikeinterface.core.baserecording import BaseRecording
 
 
 class BaseFiberPhotometryExtractor(BaseRecording):
