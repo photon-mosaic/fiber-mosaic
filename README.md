@@ -20,6 +20,23 @@ To develop the code, run:
 pip install -e .[dev]
 ```
 
+## Examples
+
+A runnable walkthrough lives in [`examples/quickstart.ipynb`](examples/quickstart.ipynb): building per-color recordings, reading fluorescence with the fiber-native API, attaching per-fiber timestamps with `set_times`, bundling colors into a `FiberPhotometryRecordingGroup`, and discovering streams with `get_streams`.
+
+The notebook is committed **without cell outputs** to keep diffs small. To populate the outputs, install Jupyter and matplotlib, then run it:
+
+```bash
+pip install -e .[dev]
+pip install jupyter matplotlib
+
+# run interactively in the browser:
+jupyter notebook examples/quickstart.ipynb
+
+# or execute top-to-bottom and write the outputs back in place:
+jupyter nbconvert --to notebook --execute --inplace examples/quickstart.ipynb
+```
+
 ## Contributing
 
 ### Linters and testing

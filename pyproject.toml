@@ -15,17 +15,18 @@ classifiers = [
 readme = "README.md"
 dynamic = ["version"]
 
-dependencies = []
+dependencies = [
+     'numpy',
+     'spikeinterface @ git+https://github.com/SpikeInterface/spikeinterface.git@main',
+]
 
 [project.optional-dependencies]
 dev = [
-    'black',
     'coverage',
     'furo',
-    'interrogate',
     'pytest',
     'pytest-cov',
-    'ruff',
+    'ruff==0.15.12',
     'Sphinx'
 ]
 
@@ -34,27 +35,6 @@ where = ["src"]
 
 [tool.setuptools.dynamic]
 version = {attr = "fiber_mosaic.__version__"}
-
-[tool.black]
-line-length = 79
-target_version = ['py312']
-exclude = '''
-
-(
-  /(
-      \.eggs         # exclude a few common directories in the
-    | \.git          # root of the project
-    | \.hg
-    | \.mypy_cache
-    | \.tox
-    | \.venv
-    | _build
-    | build
-    | dist
-  )/
-  | .gitignore
-)
-'''
 
 [tool.ruff]
 line-length = 79
@@ -84,9 +64,10 @@ convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
+"src/**/tests/**" = ["D"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "src/fiber_mosaic"]
 addopts = "--cov=fiber_mosaic --cov-report=term-missing"
 
 [tool.coverage.run]
@@ -101,7 +82,3 @@ exclude_lines = [
     "pragma: no cover"
 ]
 fail_under = 100
-
-[tool.interrogate]
-exclude = ["setup.py", "docs", "build"]
-fail-under = 100
