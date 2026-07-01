@@ -136,7 +136,9 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         if fiber_ids is not None:
             channel_ids = np.asarray(self.get_channel_ids())
             fiber_ids = np.asarray(fiber_ids)
-            channel_inds = [int(np.where(channel_ids == fid)[0][0]) for fid in fiber_ids]
+            channel_inds = [
+                int(np.where(channel_ids == fid)[0][0]) for fid in fiber_ids
+            ]
             times = times[:, channel_inds]
 
         return times
