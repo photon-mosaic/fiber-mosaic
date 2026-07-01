@@ -5,10 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 
 import numpy as np
-from spikeinterface.core.baserecording import (
-    BaseRecording,
-    BaseRecordingSegment,
-)
+from spikeinterface.core.baserecording import BaseRecording
 
 
 class BaseFiberPhotometryExtractor(BaseRecording):
@@ -64,7 +61,7 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         """Return the number of fibers (channels) in this recording."""
         return self.get_num_channels()
 
-    def add_segment(self, segment: BaseRecordingSegment) -> None:
+    def add_segment(self, segment) -> None:
         """Attach a contiguous block of fluorescence data to this recording."""
         super().add_segment(segment)
 
@@ -244,46 +241,6 @@ class BaseFiberPhotometryExtractor(BaseRecording):
             f"{self.__class__.__name__} | color={self.color} | "
             f"{n_fib} fiber(s) | {n_seg} segment(s) | "
             f"{sf:.1f} Hz | dtype: {dtype}"
-        )
-
-
-class BaseFiberPhotometrySegment(BaseRecordingSegment):
-    """
-    One contiguous block of single-color fiber photometry data.
-
-    Subclasses implement ``get_traces`` and ``get_num_samples`` per the
-    ``BaseRecordingSegment`` contract (spikeinterface internals call
-    ``get_traces`` directly). Traces are 2D ``(n_samples, n_fibers)``.
-
-    User-facing code should prefer :meth:`get_fluorescence`, which uses
-    fiber-photometry-native parameter names.
-
-    Per-fiber timestamps set via
-    :meth:`BaseFiberPhotometryExtractor.set_times` are stored on
-    :attr:`fiber_time_vectors` as a 2-D ``(n_samples, n_fibers)`` array.
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        """Initialize the segment and its (empty) per-fiber time store."""
-        super().__init__(*args, **kwargs)
-        self.fiber_time_vectors: np.ndarray | None = None
-
-    def get_fluorescence(
-        self,
-        start_frame: int | None = None,
-        end_frame: int | None = None,
-        fiber_indices: list | np.ndarray | None = None,
-    ) -> np.ndarray:
-        """
-        Return fluorescence for this segment, shape ``(n_samples, n_fibers)``.
-
-        Thin wrapper around :meth:`get_traces` that renames
-        ``channel_indices`` to ``fiber_indices``.
-        """
-        return self.get_traces(
-            start_frame=start_frame,
-            end_frame=end_frame,
-            channel_indices=fiber_indices,
         )
 
 

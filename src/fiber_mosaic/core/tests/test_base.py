@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 from fiber_mosaic.core.base import (
     BaseFiberPhotometryExtractor,
     FiberPhotometryRecordingGroup,
 )
-from fiber_mosaic.core.numpysegments import NumpyFiberPhotometrySegment
 
 
 def _make_recording(
@@ -31,8 +31,10 @@ def _make_recording(
         n_samples, n_fibers
     )
     rec.add_segment(
-        NumpyFiberPhotometrySegment(
-            traces=traces, sampling_frequency=sampling_frequency
+        NumpyRecordingSegment(
+            traces=traces,
+            sampling_frequency=sampling_frequency,
+            t_start=None,
         )
     )
     return rec, traces
@@ -42,16 +44,6 @@ def _make_recording(
 def recording():
     """Default 10x3 recording reused across extractor tests."""
     return _make_recording()
-
-
-@pytest.fixture
-def segment():
-    """10x2 ramp segment reused across segment tests."""
-    traces = np.arange(20, dtype="float32").reshape(10, 2)
-    seg = NumpyFiberPhotometrySegment(
-        traces=traces, sampling_frequency=100.0
-    )
-    return seg, traces
 
 
 @pytest.fixture
@@ -129,15 +121,17 @@ def test_multi_segment():
         dtype="float32",
     )
     rec.add_segment(
-        NumpyFiberPhotometrySegment(
+        NumpyRecordingSegment(
             traces=np.zeros((4, 2), dtype="float32"),
             sampling_frequency=100.0,
+            t_start=None,
         )
     )
     rec.add_segment(
-        NumpyFiberPhotometrySegment(
+        NumpyRecordingSegment(
             traces=np.ones((6, 2), dtype="float32"),
             sampling_frequency=100.0,
+            t_start=None,
         )
     )
     assert rec.get_num_segments() == 2
@@ -247,15 +241,17 @@ def test_set_times_multi_segment():
         dtype="float32",
     )
     rec.add_segment(
-        NumpyFiberPhotometrySegment(
+        NumpyRecordingSegment(
             traces=np.zeros((4, 2), dtype="float32"),
             sampling_frequency=100.0,
+            t_start=None,
         )
     )
     rec.add_segment(
-        NumpyFiberPhotometrySegment(
+        NumpyRecordingSegment(
             traces=np.ones((6, 2), dtype="float32"),
             sampling_frequency=100.0,
+            t_start=None,
         )
     )
     t0 = np.zeros((4, 2), dtype="float64")
@@ -266,42 +262,6 @@ def test_set_times_multi_segment():
     assert rec.has_fiber_times(segment_index=0)
     np.testing.assert_array_equal(rec.get_fiber_times(segment_index=0), t0)
     np.testing.assert_array_equal(rec.get_fiber_times(segment_index=1), t1)
-
-
-# ---------------- BaseFiberPhotometrySegment ----------------
-
-
-def test_segment_get_fluorescence_renames_fiber_indices(segment):
-    """``fiber_indices`` is forwarded to ``get_traces`` correctly."""
-    seg, traces = segment
-    np.testing.assert_array_equal(
-        seg.get_fluorescence(fiber_indices=[1]),
-        traces[:, [1]],
-    )
-
-
-def test_segment_get_fluorescence_frame_slice(segment):
-    """Frame range on the segment slices along the time axis."""
-    seg, traces = segment
-    np.testing.assert_array_equal(
-        seg.get_fluorescence(start_frame=3, end_frame=7),
-        traces[3:7],
-    )
-
-
-def test_segment_get_fluorescence_full_matches_get_traces(segment):
-    """No-arg fluorescence equals no-arg get_traces on a segment."""
-    seg, _ = segment
-    np.testing.assert_array_equal(seg.get_fluorescence(), seg.get_traces())
-
-
-def test_numpy_segment_requires_2d_traces():
-    """A non-2-D traces array is rejected at construction."""
-    with pytest.raises(ValueError):
-        NumpyFiberPhotometrySegment(
-            traces=np.zeros(10, dtype="float32"),
-            sampling_frequency=100.0,
-        )
 
 
 # ---------------- FiberPhotometryRecordingGroup ----------------
