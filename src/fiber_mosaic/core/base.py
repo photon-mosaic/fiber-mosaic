@@ -63,7 +63,7 @@ class BaseFiberPhotometryExtractor(BaseRecording):
 
     def add_segment(self, segment) -> None:
         """Attach a contiguous block of fluorescence data to this recording."""
-        super().add_segment(segment)
+        self.segments.append(segment)
 
     @classmethod
     def get_streams(cls, *args, **kwargs) -> tuple[list, list]:
