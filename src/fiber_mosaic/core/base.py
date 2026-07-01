@@ -61,7 +61,6 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         """Return the number of fibers (channels) in this recording."""
         return self.get_num_channels()
 
-
     @classmethod
     def get_streams(cls, *args, **kwargs) -> tuple[list, list]:
         """
@@ -130,7 +129,6 @@ class BaseFiberPhotometryExtractor(BaseRecording):
             end_frame=end_frame,
             channel_ids=fiber_ids,
         )
-
 
     def __repr__(self) -> str:
         """Return a one-line summary: class, color, fiber/segment count."""

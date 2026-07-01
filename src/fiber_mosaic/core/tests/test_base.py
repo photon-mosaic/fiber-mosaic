@@ -152,9 +152,9 @@ def test_set_times_per_fiber_2d(recording):
     """A 2-D (n_samples, n_fibers) array is stored as per-fiber times."""
     rec, traces = recording
     n_samples, n_fibers = traces.shape
-    times = np.arange(
-        n_samples * n_fibers, dtype="float64"
-    ).reshape(n_samples, n_fibers)
+    times = np.arange(n_samples * n_fibers, dtype="float64").reshape(
+        n_samples, n_fibers
+    )
     times = times / 1000.0
 
     assert not rec.has_fiber_times()
@@ -196,9 +196,9 @@ def test_get_fiber_times_frame_and_fiber_subset(recording):
     rec, _ = recording
     n_samples = rec.get_num_samples()
     n_fibers = rec.get_num_fibers()
-    times = np.arange(
-        n_samples * n_fibers, dtype="float64"
-    ).reshape(n_samples, n_fibers)
+    times = np.arange(n_samples * n_fibers, dtype="float64").reshape(
+        n_samples, n_fibers
+    )
     rec.set_times(times)
 
     np.testing.assert_array_equal(
