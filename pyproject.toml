@@ -17,7 +17,7 @@ dynamic = ["version"]
 
 dependencies = [
      'numpy',
-     'spikeinterface',
+     'spikeinterface @ git+https://github.com/SpikeInterface/spikeinterface.git@main',
 ]
 
 [project.optional-dependencies]
