@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 
 import numpy as np
-from spikeinterface.core.baserecording import BaseRecording
+from spikeinterface.core.baserecording import BaseRecording, BaseRecordingSegment
 
 
 class BaseFiberPhotometryExtractor(BaseRecording):
@@ -223,6 +223,14 @@ class BaseFiberPhotometryExtractor(BaseRecording):
             f"{n_fib} fiber(s) | {n_seg} segment(s) | "
             f"{sf:.1f} Hz | dtype: {dtype}"
         )
+
+    def add_segment(self, segment: BaseRecordingSegment) -> None:
+        """Add a segment to this recording, for compatibility with SpikeInterface<0.105 
+        (not released), which added `add_segment` base method instead of the 
+        `add_recording_segment` method.
+        We will remove this once we drop support for older versions of SpikeInterface.
+        """
+        self.add_recording_segment(segment)
 
 
 class FiberPhotometryRecordingGroup:
