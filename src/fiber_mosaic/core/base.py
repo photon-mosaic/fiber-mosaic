@@ -61,9 +61,85 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         """Return the number of fibers (channels) in this recording."""
         return self.get_num_channels()
 
-    def add_segment(self, segment) -> None:
-        """Attach a contiguous block of fluorescence data to this recording."""
-        self.segments.append(segment)
+    def has_fiber_times(self, segment_index: int | None = None) -> bool:
+        """Return True when explicit per-fiber times are stored for segment."""
+        segment_index = self._check_segment_index(segment_index)
+        rs = self.segments[segment_index]
+        return hasattr(rs, "_fiber_times") and rs._fiber_times is not None
+
+    def set_times(
+        self,
+        times,
+        segment_index: int | None = None,
+        with_warning: bool = True,
+    ) -> None:
+        """Set per-fiber times for one segment.
+
+        Accepts either a 1-D vector of shape ``(n_samples,)`` and broadcasts
+        to all fibers, or a 2-D matrix of shape ``(n_samples, n_fibers)``.
+        """
+        segment_index = self._check_segment_index(segment_index)
+        rs = self.segments[segment_index]
+
+        times_arr = np.asarray(times, dtype="float64")
+        n_samples = rs.get_num_samples()
+        n_fibers = self.get_num_fibers()
+
+        if times_arr.ndim == 1:
+            if times_arr.shape[0] != n_samples:
+                raise ValueError(
+                    "1-D times must have shape (n_samples,) matching the "
+                    "selected segment."
+                )
+            fiber_times = np.broadcast_to(
+                times_arr[:, np.newaxis], (n_samples, n_fibers)
+            ).copy()
+        elif times_arr.ndim == 2:
+            if times_arr.shape != (n_samples, n_fibers):
+                raise ValueError(
+                    "2-D times must have shape (n_samples, n_fibers)."
+                )
+            fiber_times = times_arr
+        else:
+            raise ValueError("times must be 1-D or 2-D.")
+
+        rs._fiber_times = fiber_times
+
+    def get_fiber_times(
+        self,
+        segment_index: int | None = None,
+        start_frame: int | None = None,
+        end_frame: int | None = None,
+        fiber_ids: list | np.ndarray | tuple | None = None,
+    ) -> np.ndarray:
+        """Return per-fiber times with optional frame/fiber subsetting."""
+        segment_index = self._check_segment_index(segment_index)
+        rs = self.segments[segment_index]
+
+        if self.has_fiber_times(segment_index=segment_index):
+            times = rs._fiber_times
+        else:
+            n_samples = rs.get_num_samples()
+            dt = 1.0 / self.get_sampling_frequency()
+            base_times = np.arange(n_samples, dtype="float64") * dt
+            times = np.broadcast_to(
+                base_times[:, np.newaxis], (n_samples, self.get_num_fibers())
+            )
+
+        if start_frame is None:
+            start_frame = 0
+        if end_frame is None:
+            end_frame = rs.get_num_samples()
+
+        times = times[start_frame:end_frame]
+
+        if fiber_ids is not None:
+            channel_ids = np.asarray(self.get_channel_ids())
+            fiber_ids = np.asarray(fiber_ids)
+            channel_inds = [int(np.where(channel_ids == fid)[0][0]) for fid in fiber_ids]
+            times = times[:, channel_inds]
+
+        return times
 
     @classmethod
     def get_streams(cls, *args, **kwargs) -> tuple[list, list]:
