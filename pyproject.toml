@@ -22,9 +22,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Format-specific readers that rely on optional third-party libraries.
+doric = ['h5py']
+nwb = ['pynwb']
 dev = [
     'coverage',
     'furo',
+    'h5py',
+    'pynwb',
     'pytest',
     'pytest-cov',
     'ruff==0.15.12',
