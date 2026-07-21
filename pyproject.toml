@@ -17,6 +17,7 @@ dynamic = ["version"]
 
 dependencies = [
      'numpy',
+     'pandas',
      'spikeinterface @ git+https://github.com/SpikeInterface/spikeinterface.git@main',
 ]
 
