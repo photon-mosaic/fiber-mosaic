@@ -22,7 +22,7 @@ try:
     import h5py
 
     HAVE_H5PY = True
-except ImportError:
+except ImportError:  # pragma: no cover
     HAVE_H5PY = False
 
 

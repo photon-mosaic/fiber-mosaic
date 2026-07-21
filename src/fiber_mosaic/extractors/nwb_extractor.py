@@ -22,7 +22,7 @@ try:
     from pynwb import NWBHDF5IO
 
     HAVE_PYNWB = True
-except ImportError:
+except ImportError:  # pragma: no cover
     HAVE_PYNWB = False
 
 
@@ -75,7 +75,7 @@ def _find_nwb_file(folder_path: str | Path) -> Path:
     return nwb_files[0]
 
 
-def _get_ndx_events_version(io) -> str | None:
+def _get_ndx_events_version(io) -> str | None:  # pragma: no cover
     """Get the ndx-events namespace version from an open NWBHDF5IO."""
     try:
         namespaces = io._file.attrs.get("namespace_versions", {})

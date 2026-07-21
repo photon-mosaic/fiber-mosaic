@@ -106,7 +106,7 @@ def classify_csv_file(path: str) -> str:
         )
     elif len(cols) >= 2:
         return "npm"
-    else:
+    else:  # pragma: no cover
         msg = f"CSV file has unexpected number of columns: {len(cols)}"
         raise ValueError(msg)
 

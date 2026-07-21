@@ -89,7 +89,7 @@ def parse_dandi_uri(uri: str) -> tuple[str, str]:
     return dandiset_id, asset_path
 
 
-def _check_dandi_dependencies():
+def _check_dandi_dependencies():  # pragma: no cover
     """Check for required DANDI streaming dependencies."""
     missing = []
 
@@ -120,7 +120,7 @@ def _check_dandi_dependencies():
         )
 
 
-def _stream_nwb(dandiset_id: str, asset_path: str):
+def _stream_nwb(dandiset_id: str, asset_path: str):  # pragma: no cover
     """
     Open a streaming connection to an NWB file on the DANDI Archive.
 
