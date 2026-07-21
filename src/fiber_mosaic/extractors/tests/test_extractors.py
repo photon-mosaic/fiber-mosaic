@@ -274,9 +274,7 @@ class TestBaseFiberPhotometryExtractor:
             fiber_ids=["f1", "f2"],
             color="green",
         )
-        segment = NumpyRecordingSegment(
-            np.zeros((100, 2)), 100.0, t_start=0.0
-        )
+        segment = NumpyRecordingSegment(np.zeros((100, 2)), 100.0, t_start=0.0)
         rec.add_segment(segment)
 
         with pytest.raises(ValueError, match="1D times array length"):
@@ -296,9 +294,7 @@ class TestBaseFiberPhotometryExtractor:
             fiber_ids=["f1", "f2"],
             color="green",
         )
-        segment = NumpyRecordingSegment(
-            np.zeros((100, 2)), 100.0, t_start=0.0
-        )
+        segment = NumpyRecordingSegment(np.zeros((100, 2)), 100.0, t_start=0.0)
         rec.add_segment(segment)
 
         with pytest.raises(ValueError, match="2D times array shape"):
@@ -318,9 +314,7 @@ class TestBaseFiberPhotometryExtractor:
             fiber_ids=["f1", "f2"],
             color="green",
         )
-        segment = NumpyRecordingSegment(
-            np.zeros((100, 2)), 100.0, t_start=0.0
-        )
+        segment = NumpyRecordingSegment(np.zeros((100, 2)), 100.0, t_start=0.0)
         rec.add_segment(segment)
 
         with pytest.raises(ValueError, match="must be 1D or 2D"):
@@ -340,9 +334,7 @@ class TestBaseFiberPhotometryExtractor:
             fiber_ids=["f1", "f2"],
             color="green",
         )
-        segment = NumpyRecordingSegment(
-            np.zeros((100, 2)), 100.0, t_start=0.0
-        )
+        segment = NumpyRecordingSegment(np.zeros((100, 2)), 100.0, t_start=0.0)
         rec.add_segment(segment)
 
         # Don't set times - should fall back to nominal
@@ -364,9 +356,7 @@ class TestBaseFiberPhotometryExtractor:
             fiber_ids=["f1", "f2", "f3"],
             color="green",
         )
-        segment = NumpyRecordingSegment(
-            np.zeros((100, 3)), 100.0, t_start=0.0
-        )
+        segment = NumpyRecordingSegment(np.zeros((100, 3)), 100.0, t_start=0.0)
         rec.add_segment(segment)
 
         # Get times for specific fibers
@@ -387,9 +377,7 @@ class TestBaseFiberPhotometryExtractor:
             fiber_ids=["f1", "f2"],
             color="green",
         )
-        segment = NumpyRecordingSegment(
-            np.zeros((100, 2)), 100.0, t_start=0.0
-        )
+        segment = NumpyRecordingSegment(np.zeros((100, 2)), 100.0, t_start=0.0)
         rec.add_segment(segment)
         rec.set_times(np.arange(100) / 100.0)
 
@@ -652,9 +640,7 @@ class TestFormatDetection:
             csv_path = Path(tmpdir) / "doric_data.csv"
             # Doric CSV has all-string header rows
             csv_path.write_text(
-                "Console,I/O,AIn-1\n"
-                "Time(s),Voltage,Signal\n"
-                "0.0,1.0,100.0\n"
+                "Console,I/O,AIn-1\nTime(s),Voltage,Signal\n0.0,1.0,100.0\n"
             )
             formats = detect_formats(tmpdir)
             assert "doric" in formats
@@ -717,8 +703,7 @@ class TestFormatDetection:
             # Create NPM data file
             npm_path = Path(tmpdir) / "npm_data.csv"
             npm_path.write_text(
-                "Timestamp,LedState,Region0G,Region1G\n"
-                "0,1,100.0,200.0\n"
+                "Timestamp,LedState,Region0G,Region1G\n0,1,100.0,200.0\n"
             )
             # Create NPM event file (should be suppressed)
             event_path = Path(tmpdir) / "event_data.csv"
@@ -765,10 +750,7 @@ class TestDoricExtractor:
             csv_path = Path(tmpdir) / "doric_data.csv"
             # Single data column (Signal) plus Time(s)
             csv_path.write_text(
-                "Console,Signal\n"
-                "Time(s),Signal\n"
-                "0.0,100.0\n"
-                "0.1,101.0\n"
+                "Console,Signal\nTime(s),Signal\n0.0,100.0\n0.1,101.0\n"
             )
 
             rec = DoricFiberPhotometryExtractor(csv_path)
@@ -781,11 +763,7 @@ class TestDoricExtractor:
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "doric_data.csv"
             # Only Time(s) column, no data streams
-            csv_path.write_text(
-                "Console\n"
-                "Time(s)\n"
-                "0.0\n"
-            )
+            csv_path.write_text("Console\nTime(s)\n0.0\n")
 
             with pytest.raises(ValueError, match="No streams"):
                 DoricFiberPhotometryExtractor(csv_path)
@@ -811,11 +789,7 @@ class TestDoricExtractor:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "doric_data.csv"
-            csv_path.write_text(
-                "Console,Signal\n"
-                "Time(s),Signal\n"
-                "0.0,100.0\n"
-            )
+            csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
 
             with pytest.raises(ValueError, match="not found"):
                 DoricFiberPhotometryExtractor(
@@ -846,11 +820,7 @@ class TestDoricExtractor:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "doric_data.csv"
-            csv_path.write_text(
-                "Console,Signal\n"
-                "Time(s),Signal\n"
-                "0.0,100.0\n"
-            )
+            csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
 
             names, ids = DoricFiberPhotometryExtractor.get_streams(tmpdir)
             assert "Signal" in names
@@ -871,11 +841,7 @@ class TestDoricExtractor:
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "doric_data.csv"
             # Single stream so auto-selection works
-            csv_path.write_text(
-                "Console,Signal\n"
-                "Time(s),Signal\n"
-                "0.0,100.0\n"
-            )
+            csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
 
             rec = DoricFiberPhotometryExtractor(tmpdir)
             assert rec.get_num_samples() == 1
@@ -897,11 +863,7 @@ class TestDoricExtractor:
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "doric_data.csv"
             # Single stream so auto-selection works
-            csv_path.write_text(
-                "Console,Signal\n"
-                "Time(s),Signal\n"
-                "0.0,100.0\n"
-            )
+            csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
 
             rec = read_doric_fiber_photometry(csv_path)
             assert rec.get_num_samples() == 1
@@ -967,8 +929,7 @@ class TestNpmExtractor:
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "npm_data.csv"
             csv_path.write_text(
-                "Timestamp,LedState,Region0G,Region1G\n"
-                "0,1,100.0,200.0\n"
+                "Timestamp,LedState,Region0G,Region1G\n0,1,100.0,200.0\n"
             )
 
             with pytest.raises(ValueError, match="not found"):
@@ -1060,11 +1021,7 @@ class TestNpmExtractor:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "npm_data.csv"
-            csv_path.write_text(
-                "LedState,Region0G\n"
-                "1,100.0\n"
-                "1,101.0\n"
-            )
+            csv_path.write_text("LedState,Region0G\n1,100.0\n1,101.0\n")
 
             rec = NpmFiberPhotometryExtractor(
                 csv_path, stream_name="Region0G_led1"
@@ -1079,10 +1036,7 @@ class TestNpmExtractor:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "npm_data.csv"
-            csv_path.write_text(
-                "Timestamp,LedState,Region0G\n"
-                "0,1,100.0\n"
-            )
+            csv_path.write_text("Timestamp,LedState,Region0G\n0,1,100.0\n")
 
             rec = read_npm_fiber_photometry(
                 csv_path, stream_name="Region0G_led1"
@@ -1095,11 +1049,7 @@ class TestNpmExtractor:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "npm_data.csv"
-            csv_path.write_text(
-                "Timestamp,Region0G\n"
-                "0,100.0\n"
-                "10,101.0\n"
-            )
+            csv_path.write_text("Timestamp,Region0G\n0,100.0\n10,101.0\n")
 
             rec = NpmFiberPhotometryExtractor(
                 csv_path, stream_name="Region0G_led0"
@@ -1290,11 +1240,7 @@ class TestAdditionalCoverage:
         for time_col in ["Time", "Timestamps", "Time(s)"]:
             with tempfile.TemporaryDirectory() as tmpdir:
                 csv_path = Path(tmpdir) / "data.csv"
-                csv_path.write_text(
-                    f"{time_col},data\n"
-                    "0.0,1.0\n"
-                    "0.1,2.0\n"
-                )
+                csv_path.write_text(f"{time_col},data\n0.0,1.0\n0.1,2.0\n")
 
                 rec = CsvFiberPhotometryExtractor(csv_path, color="green")
                 assert rec.get_num_samples() == 2
@@ -1306,9 +1252,7 @@ class TestAdditionalCoverage:
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "data.csv"
             csv_path.write_text(
-                "time,fiber1,fiber2,fiber3\n"
-                "0.0,1.0,2.0,3.0\n"
-                "0.1,1.1,2.1,3.1\n"
+                "time,fiber1,fiber2,fiber3\n0.0,1.0,2.0,3.0\n0.1,1.1,2.1,3.1\n"
             )
 
             rec = CsvFiberPhotometryExtractor(
@@ -1323,10 +1267,7 @@ class TestAdditionalCoverage:
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "data.csv"
             # File with numeric headers (headerless)
-            csv_path.write_text(
-                "0.0,1.0,2.0,3.0\n"
-                "0.1,1.1,2.1,3.1\n"
-            )
+            csv_path.write_text("0.0,1.0,2.0,3.0\n0.1,1.1,2.1,3.1\n")
 
             result = classify_csv_file(str(csv_path))
             assert result == "npm"
@@ -1339,8 +1280,7 @@ class TestAdditionalCoverage:
             csv_path = Path(tmpdir) / "data.csv"
             # Need >3 columns for NPM detection via Region columns
             csv_path.write_text(
-                "Timestamp,LedState,Region0G,Region1G\n"
-                "0,1,100.0,200.0\n"
+                "Timestamp,LedState,Region0G,Region1G\n0,1,100.0,200.0\n"
             )
 
             result = classify_csv_file(str(csv_path))
@@ -1374,9 +1314,7 @@ class TestAdditionalCoverage:
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "npm_data.csv"
             csv_path.write_text(
-                "FrameCounter,LedState,Region0G\n"
-                "0,1,100.0\n"
-                "1,1,101.0\n"
+                "FrameCounter,LedState,Region0G\n0,1,100.0\n1,1,101.0\n"
             )
 
             rec = NpmFiberPhotometryExtractor(
@@ -1391,9 +1329,7 @@ class TestAdditionalCoverage:
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "npm_data.csv"
             csv_path.write_text(
-                "Timestamp,Flags,Region0G\n"
-                "0,1,100.0\n"
-                "10,1,101.0\n"
+                "Timestamp,Flags,Region0G\n0,1,100.0\n10,1,101.0\n"
             )
 
             rec = NpmFiberPhotometryExtractor(
@@ -1407,10 +1343,7 @@ class TestAdditionalCoverage:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "npm_data.csv"
-            csv_path.write_text(
-                "Timestamp,LedState,Region0G\n"
-                "0,1,100.0\n"
-            )
+            csv_path.write_text("Timestamp,LedState,Region0G\n0,1,100.0\n")
 
             rec = NpmFiberPhotometryExtractor(
                 csv_path, stream_name="Region0G_led1"
@@ -1440,11 +1373,7 @@ class TestAdditionalCoverage:
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "doric_data.csv"
             # Single stream (Signal) for auto-selection
-            csv_path.write_text(
-                "Console,Signal\n"
-                "Time(s),Signal\n"
-                "0.0,100.0\n"
-            )
+            csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
 
             rec = DoricFiberPhotometryExtractor(csv_path)
             assert rec.get_num_samples() == 1
@@ -1457,9 +1386,7 @@ class TestAdditionalCoverage:
             # Create Doric CSV
             csv_path = Path(tmpdir) / "doric_data.csv"
             csv_path.write_text(
-                "Console,I/O,AIn-1\n"
-                "Time(s),Voltage,Signal\n"
-                "0.0,1.0,100.0\n"
+                "Console,I/O,AIn-1\nTime(s),Voltage,Signal\n0.0,1.0,100.0\n"
             )
 
             doric_files, csv_files = _find_doric_files(Path(tmpdir))
@@ -1707,8 +1634,7 @@ class TestDandiExtractorFullCoverage:
         mock_io = MagicMock()
 
         with patch(
-            "fiber_mosaic.extractors.dandi_extractor."
-            "_check_dandi_dependencies"
+            "fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"
         ):
             with patch(
                 "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
@@ -1717,7 +1643,7 @@ class TestDandiExtractorFullCoverage:
                 rec = DandiFiberPhotometryExtractor(
                     "dandi://000123/sub-1/file.nwb",
                     series_name="GCaMP",
-                    color="green"
+                    color="green",
                 )
                 assert rec.get_num_fibers() == 2
                 assert rec.color == "green"
@@ -1746,8 +1672,7 @@ class TestDandiExtractorFullCoverage:
         mock_io = MagicMock()
 
         with patch(
-            "fiber_mosaic.extractors.dandi_extractor."
-            "_check_dandi_dependencies"
+            "fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"
         ):
             with patch(
                 "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
@@ -1769,8 +1694,7 @@ class TestDandiExtractorFullCoverage:
         mock_io = MagicMock()
 
         with patch(
-            "fiber_mosaic.extractors.dandi_extractor."
-            "_check_dandi_dependencies"
+            "fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"
         ):
             with patch(
                 "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
@@ -1779,7 +1703,9 @@ class TestDandiExtractorFullCoverage:
                 with pytest.raises(
                     ValueError, match="No FiberPhotometryResponseSeries"
                 ):
-                    DandiFiberPhotometryExtractor("dandi://000123/sub-1/file.nwb")
+                    DandiFiberPhotometryExtractor(
+                        "dandi://000123/sub-1/file.nwb"
+                    )
 
     def test_dandi_extractor_multiple_series_no_name(self):
         """Test error when multiple series and no name specified."""
@@ -1799,15 +1725,16 @@ class TestDandiExtractorFullCoverage:
         mock_io = MagicMock()
 
         with patch(
-            "fiber_mosaic.extractors.dandi_extractor."
-            "_check_dandi_dependencies"
+            "fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"
         ):
             with patch(
                 "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
                 return_value=(mock_nwbfile, mock_io),
             ):
                 with pytest.raises(ValueError, match="Multiple series found"):
-                    DandiFiberPhotometryExtractor("dandi://000123/sub-1/file.nwb")
+                    DandiFiberPhotometryExtractor(
+                        "dandi://000123/sub-1/file.nwb"
+                    )
 
     def test_dandi_extractor_series_not_found(self):
         """Test error when specified series not found."""
@@ -1823,8 +1750,7 @@ class TestDandiExtractorFullCoverage:
         mock_io = MagicMock()
 
         with patch(
-            "fiber_mosaic.extractors.dandi_extractor."
-            "_check_dandi_dependencies"
+            "fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"
         ):
             with patch(
                 "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
@@ -1833,7 +1759,7 @@ class TestDandiExtractorFullCoverage:
                 with pytest.raises(ValueError, match="not found"):
                     DandiFiberPhotometryExtractor(
                         "dandi://000123/sub-1/file.nwb",
-                        series_name="NonexistentSeries"
+                        series_name="NonexistentSeries",
                     )
 
     def test_dandi_get_streams_full(self):
@@ -1850,8 +1776,7 @@ class TestDandiExtractorFullCoverage:
         mock_io = MagicMock()
 
         with patch(
-            "fiber_mosaic.extractors.dandi_extractor."
-            "_check_dandi_dependencies"
+            "fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"
         ):
             with patch(
                 "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
@@ -1889,8 +1814,7 @@ class TestDandiExtractorFullCoverage:
         mock_io = MagicMock()
 
         with patch(
-            "fiber_mosaic.extractors.dandi_extractor."
-            "_check_dandi_dependencies"
+            "fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"
         ):
             with patch(
                 "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
@@ -1899,7 +1823,7 @@ class TestDandiExtractorFullCoverage:
                 rec = read_dandi_fiber_photometry(
                     "dandi://000123/sub-1/file.nwb",
                     series_name="GCaMP",
-                    color="green"
+                    color="green",
                 )
                 assert rec.get_num_fibers() == 1
 
@@ -1962,9 +1886,7 @@ class TestDetectFormatsFullCoverage:
             # Doric CSV (all strings in first rows)
             csv_path = Path(tmpdir) / "doric.csv"
             csv_path.write_text(
-                "Console,I/O,Signal\n"
-                "Time(s),Voltage,Value\n"
-                "0.0,1.0,100.0\n"
+                "Console,I/O,Signal\nTime(s),Voltage,Value\n0.0,1.0,100.0\n"
             )
             result = classify_csv_file(str(csv_path))
             assert result == "doric"
@@ -1976,10 +1898,7 @@ class TestDetectFormatsFullCoverage:
         with tempfile.TemporaryDirectory() as tmpdir:
             # NPM-like CSV (2+ columns, numeric data)
             csv_path = Path(tmpdir) / "npm.csv"
-            csv_path.write_text(
-                "time,data\n"
-                "0.0,1.0\n"
-            )
+            csv_path.write_text("time,data\n0.0,1.0\n")
             result = classify_csv_file(str(csv_path))
             assert result == "npm"
 
@@ -2074,10 +1993,13 @@ class TestDoricExtractorFullCoverage:
             ]
 
             # V6 has Configurations and DataAcquisition
-            mock_h5file.__contains__ = lambda self, x: x in [
-                "Configurations",
-                "DataAcquisition",
-            ]
+            mock_h5file.__contains__ = lambda self, x: (
+                x
+                in [
+                    "Configurations",
+                    "DataAcquisition",
+                ]
+            )
 
             with patch(
                 "fiber_mosaic.extractors.doric_extractor.h5py.File",
@@ -2131,8 +2053,8 @@ class TestDoricExtractorFullCoverage:
         mock_data = np.array([100.0, 101.0, 102.0])
 
         mock_console = MagicMock()
-        mock_console.__getitem__ = (
-            lambda self, k: mock_timestamps if k == "Time(s)" else mock_data
+        mock_console.__getitem__ = lambda self, k: (
+            mock_timestamps if k == "Time(s)" else mock_data
         )
 
         mock_traces = MagicMock()
@@ -2156,8 +2078,8 @@ class TestDoricExtractorFullCoverage:
 
         mock_data_group = MagicMock()
         mock_data_group.__contains__ = lambda self, k: k in ["Values", "Time"]
-        mock_data_group.__getitem__ = (
-            lambda self, k: mock_data if k == "Values" else mock_timestamps
+        mock_data_group.__getitem__ = lambda self, k: (
+            mock_data if k == "Values" else mock_timestamps
         )
         mock_data_group.keys.return_value = ["Values", "Time"]
 
@@ -2278,7 +2200,7 @@ class TestDoricExtractorFullCoverage:
                         rec = DoricFiberPhotometryExtractor(
                             str(doric_path),
                             stream_name="Signal",
-                            color="green"
+                            color="green",
                         )
                         assert rec.get_num_samples() == 3
 
@@ -2329,8 +2251,8 @@ class TestDoricExtractorFullCoverage:
                 with patch(
                     "fiber_mosaic.extractors.doric_extractor._check_h5py"
                 ):
-                    names, ids = (
-                        DoricFiberPhotometryExtractor.get_streams(tmpdir)
+                    names, ids = DoricFiberPhotometryExtractor.get_streams(
+                        tmpdir
                     )
                     assert "Signal" in names
 
@@ -2364,8 +2286,7 @@ class TestNpmExtractorFullCoverage:
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "npm_data.csv"
             csv_path.write_text(
-                "Timestamp,LedState,Region0G,Region1G\n"
-                "0,1,100.0,200.0\n"
+                "Timestamp,LedState,Region0G,Region1G\n0,1,100.0,200.0\n"
             )
 
             names, ids = NpmFiberPhotometryExtractor.get_streams(tmpdir)
@@ -2398,8 +2319,8 @@ class TestNwbExtractorFullCoverage:
             mock_series.data.__getitem__ = lambda self, x: mock_data
             mock_series.data.shape = mock_data.shape
             mock_series.timestamps = MagicMock()
-            mock_series.timestamps.__getitem__ = (
-                lambda self, x: mock_timestamps
+            mock_series.timestamps.__getitem__ = lambda self, x: (
+                mock_timestamps
             )
             mock_series.timestamps.__len__ = lambda self: len(mock_timestamps)
             mock_series.timestamps.__bool__ = lambda self: True
@@ -2418,9 +2339,7 @@ class TestNwbExtractorFullCoverage:
                     return_value=mock_io,
                 ):
                     rec = NwbFiberPhotometryExtractor(
-                        str(nwb_path),
-                        series_name="FPSeries",
-                        color="green"
+                        str(nwb_path), series_name="FPSeries", color="green"
                     )
                     assert rec.get_num_fibers() == 2
                     assert rec.color == "green"
@@ -2516,8 +2435,7 @@ class TestNwbExtractorFullCoverage:
                 ):
                     with pytest.raises(ValueError, match="not found"):
                         NwbFiberPhotometryExtractor(
-                            str(nwb_path),
-                            series_name="NonexistentSeries"
+                            str(nwb_path), series_name="NonexistentSeries"
                         )
 
     def test_nwb_get_streams_full(self):
@@ -2570,8 +2488,8 @@ class TestNwbExtractorFullCoverage:
             mock_series.data.__getitem__ = lambda self, x: mock_data
             mock_series.data.shape = mock_data.shape
             mock_series.timestamps = MagicMock()
-            mock_series.timestamps.__getitem__ = (
-                lambda self, x: mock_timestamps
+            mock_series.timestamps.__getitem__ = lambda self, x: (
+                mock_timestamps
             )
             mock_series.timestamps.__len__ = lambda self: len(mock_timestamps)
             mock_series.timestamps.__bool__ = lambda self: True
@@ -2639,23 +2557,28 @@ class TestTdtExtractorFullCoverage:
 
             # TSQ format: size(4), type(4), name(4), chan(2), sort_code(2),
             #             timestamp(8), fp_loc(8), format(4), frequency(4)
-            dtype = np.dtype([
-                ("size", np.int32),
-                ("type", np.int32),
-                ("name", "S4"),
-                ("chan", np.uint16),
-                ("sort_code", np.uint16),
-                ("timestamp", np.float64),
-                ("fp_loc", np.int64),
-                ("strobe", np.float64),
-                ("format", np.int32),
-                ("frequency", np.float32),
-            ])
+            dtype = np.dtype(
+                [
+                    ("size", np.int32),
+                    ("type", np.int32),
+                    ("name", "S4"),
+                    ("chan", np.uint16),
+                    ("sort_code", np.uint16),
+                    ("timestamp", np.float64),
+                    ("fp_loc", np.int64),
+                    ("strobe", np.float64),
+                    ("format", np.int32),
+                    ("frequency", np.float32),
+                ]
+            )
 
             # Create a minimal TSQ record
-            record = np.array([
-                (40, 2, b"Dv1A", 1, 0, 0.0, 40, 0.0, 0, 1000.0),
-            ], dtype=dtype)
+            record = np.array(
+                [
+                    (40, 2, b"Dv1A", 1, 0, 0.0, 40, 0.0, 0, 1000.0),
+                ],
+                dtype=dtype,
+            )
             record.tofile(str(tsq_path))
 
             df, found = _read_tsq(tmpdir)
@@ -2667,9 +2590,11 @@ class TestTdtExtractorFullCoverage:
         from fiber_mosaic.extractors.tdt_extractor import _get_store_names
 
         # Create a mock DataFrame
-        df = pd.DataFrame({
-            "name": [b"Dv1A", b"Dv2A", b"xxx", b"Dv1A"],  # Some duplicates
-        })
+        df = pd.DataFrame(
+            {
+                "name": [b"Dv1A", b"Dv2A", b"xxx", b"Dv1A"],  # Some duplicates
+            }
+        )
 
         names = _get_store_names(df)
         assert "Dv1A" in names
@@ -2685,15 +2610,17 @@ class TestTdtExtractorFullCoverage:
             tev_path = Path(tmpdir) / "test.tev"
             tev_path.write_bytes(b"\x00" * 100)
 
-            header_df = pd.DataFrame({
-                "name": [b"Dv1A"],
-                "format": [0],
-                "frequency": [1000.0],
-                "timestamp": [0.0],
-                "chan": [1],
-                "fp_loc": [0],
-                "size": [50],
-            })
+            header_df = pd.DataFrame(
+                {
+                    "name": [b"Dv1A"],
+                    "format": [0],
+                    "frequency": [1000.0],
+                    "timestamp": [0.0],
+                    "chan": [1],
+                    "fp_loc": [0],
+                    "size": [50],
+                }
+            )
 
             with pytest.raises(ValueError, match="not found"):
                 _read_tev_store(Path(tmpdir), header_df, "NonexistentStore")
@@ -2703,9 +2630,11 @@ class TestTdtExtractorFullCoverage:
         from fiber_mosaic.extractors.tdt_extractor import _read_tev_store
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            header_df = pd.DataFrame({
-                "name": [b"Dv1A"],
-            })
+            header_df = pd.DataFrame(
+                {
+                    "name": [b"Dv1A"],
+                }
+            )
 
             with pytest.raises(FileNotFoundError, match="No TEV file"):
                 _read_tev_store(Path(tmpdir), header_df, "Dv1A")
@@ -2718,9 +2647,11 @@ class TestTdtExtractorFullCoverage:
             (Path(tmpdir) / "file1.tev").touch()
             (Path(tmpdir) / "file2.tev").touch()
 
-            header_df = pd.DataFrame({
-                "name": [b"Dv1A"],
-            })
+            header_df = pd.DataFrame(
+                {
+                    "name": [b"Dv1A"],
+                }
+            )
 
             with pytest.raises(ValueError, match="Multiple TEV files"):
                 _read_tev_store(Path(tmpdir), header_df, "Dv1A")
@@ -2741,23 +2672,28 @@ class TestTdtExtractorFullCoverage:
             # Create TSQ with no valid stores (names too short)
             tsq_path = Path(tmpdir) / "test.tsq"
 
-            dtype = np.dtype([
-                ("size", np.int32),
-                ("type", np.int32),
-                ("name", "S4"),
-                ("chan", np.uint16),
-                ("sort_code", np.uint16),
-                ("timestamp", np.float64),
-                ("fp_loc", np.int64),
-                ("strobe", np.float64),
-                ("format", np.int32),
-                ("frequency", np.float32),
-            ])
+            dtype = np.dtype(
+                [
+                    ("size", np.int32),
+                    ("type", np.int32),
+                    ("name", "S4"),
+                    ("chan", np.uint16),
+                    ("sort_code", np.uint16),
+                    ("timestamp", np.float64),
+                    ("fp_loc", np.int64),
+                    ("strobe", np.float64),
+                    ("format", np.int32),
+                    ("frequency", np.float32),
+                ]
+            )
 
             # Name too short - will be filtered
-            record = np.array([
-                (40, 2, b"x", 1, 0, 0.0, 40, 0.0, 0, 1000.0),
-            ], dtype=dtype)
+            record = np.array(
+                [
+                    (40, 2, b"x", 1, 0, 0.0, 40, 0.0, 0, 1000.0),
+                ],
+                dtype=dtype,
+            )
             record.tofile(str(tsq_path))
 
             with pytest.raises(ValueError, match="No valid stores"):
@@ -2772,22 +2708,42 @@ class TestTdtExtractorFullCoverage:
 
             # Match the real TDT layout used by the source reader: fp_loc
             # and strobe form an 8-byte union at offset 24 (40-byte records).
-            dtype = np.dtype({
-                "names": (
-                    "size", "type", "name", "chan", "sort_code",
-                    "timestamp", "fp_loc", "format", "frequency",
-                ),
-                "formats": (
-                    np.int32, np.int32, "S4", np.uint16, np.uint16,
-                    np.float64, np.int64, np.int32, np.float32,
-                ),
-                "offsets": (0, 4, 8, 12, 14, 16, 24, 32, 36),
-            }, align=True)
+            dtype = np.dtype(
+                {
+                    "names": (
+                        "size",
+                        "type",
+                        "name",
+                        "chan",
+                        "sort_code",
+                        "timestamp",
+                        "fp_loc",
+                        "format",
+                        "frequency",
+                    ),
+                    "formats": (
+                        np.int32,
+                        np.int32,
+                        "S4",
+                        np.uint16,
+                        np.uint16,
+                        np.float64,
+                        np.int64,
+                        np.int32,
+                        np.float32,
+                    ),
+                    "offsets": (0, 4, 8, 12, 14, 16, 24, 32, 36),
+                },
+                align=True,
+            )
 
-            record = np.array([
-                (40, 2, b"Dv1A", 1, 0, 0.0, 40, 0, 1000.0),
-                (40, 2, b"Dv2A", 1, 0, 0.0, 80, 0, 1000.0),
-            ], dtype=dtype)
+            record = np.array(
+                [
+                    (40, 2, b"Dv1A", 1, 0, 0.0, 40, 0, 1000.0),
+                    (40, 2, b"Dv2A", 1, 0, 0.0, 80, 0, 1000.0),
+                ],
+                dtype=dtype,
+            )
             record.tofile(str(tsq_path))
 
             with pytest.raises(ValueError, match="Multiple stores"):
@@ -2800,22 +2756,27 @@ class TestTdtExtractorFullCoverage:
         with tempfile.TemporaryDirectory() as tmpdir:
             tsq_path = Path(tmpdir) / "test.tsq"
 
-            dtype = np.dtype([
-                ("size", np.int32),
-                ("type", np.int32),
-                ("name", "S4"),
-                ("chan", np.uint16),
-                ("sort_code", np.uint16),
-                ("timestamp", np.float64),
-                ("fp_loc", np.int64),
-                ("strobe", np.float64),
-                ("format", np.int32),
-                ("frequency", np.float32),
-            ])
+            dtype = np.dtype(
+                [
+                    ("size", np.int32),
+                    ("type", np.int32),
+                    ("name", "S4"),
+                    ("chan", np.uint16),
+                    ("sort_code", np.uint16),
+                    ("timestamp", np.float64),
+                    ("fp_loc", np.int64),
+                    ("strobe", np.float64),
+                    ("format", np.int32),
+                    ("frequency", np.float32),
+                ]
+            )
 
-            record = np.array([
-                (40, 2, b"Dv1A", 1, 0, 0.0, 40, 0.0, 0, 1000.0),
-            ], dtype=dtype)
+            record = np.array(
+                [
+                    (40, 2, b"Dv1A", 1, 0, 0.0, 40, 0.0, 0, 1000.0),
+                ],
+                dtype=dtype,
+            )
             record.tofile(str(tsq_path))
 
             with pytest.raises(ValueError, match="not found"):
@@ -2833,22 +2794,42 @@ class TestTdtExtractorFullCoverage:
 
             # Event/strobe records store the strobe value in the offset-24
             # union (where continuous records keep fp_loc).
-            dtype = np.dtype({
-                "names": (
-                    "size", "type", "name", "chan", "sort_code",
-                    "timestamp", "strobe", "format", "frequency",
-                ),
-                "formats": (
-                    np.int32, np.int32, "S4", np.uint16, np.uint16,
-                    np.float64, np.float64, np.int32, np.float32,
-                ),
-                "offsets": (0, 4, 8, 12, 14, 16, 24, 32, 36),
-            }, align=True)
+            dtype = np.dtype(
+                {
+                    "names": (
+                        "size",
+                        "type",
+                        "name",
+                        "chan",
+                        "sort_code",
+                        "timestamp",
+                        "strobe",
+                        "format",
+                        "frequency",
+                    ),
+                    "formats": (
+                        np.int32,
+                        np.int32,
+                        "S4",
+                        np.uint16,
+                        np.uint16,
+                        np.float64,
+                        np.float64,
+                        np.int32,
+                        np.float32,
+                    ),
+                    "offsets": (0, 4, 8, 12, 14, 16, 24, 32, 36),
+                },
+                align=True,
+            )
 
             # format=4 (code 5 after +1) means strobe/event data
-            record = np.array([
-                (10, 2, b"Evnt", 1, 0, 0.0, 123.0, 4, 0.0),
-            ], dtype=dtype)
+            record = np.array(
+                [
+                    (10, 2, b"Evnt", 1, 0, 0.0, 123.0, 4, 0.0),
+                ],
+                dtype=dtype,
+            )
             record.tofile(str(tsq_path))
 
             # Create minimal TEV file
@@ -2866,24 +2847,44 @@ class TestTdtExtractorFullCoverage:
             tev_path = Path(tmpdir) / "test.tev"
 
             # 40-byte records with fp_loc in the offset-24 union.
-            dtype = np.dtype({
-                "names": (
-                    "size", "type", "name", "chan", "sort_code",
-                    "timestamp", "fp_loc", "format", "frequency",
-                ),
-                "formats": (
-                    np.int32, np.int32, "S4", np.uint16, np.uint16,
-                    np.float64, np.int64, np.int32, np.float32,
-                ),
-                "offsets": (0, 4, 8, 12, 14, 16, 24, 32, 36),
-            }, align=True)
+            dtype = np.dtype(
+                {
+                    "names": (
+                        "size",
+                        "type",
+                        "name",
+                        "chan",
+                        "sort_code",
+                        "timestamp",
+                        "fp_loc",
+                        "format",
+                        "frequency",
+                    ),
+                    "formats": (
+                        np.int32,
+                        np.int32,
+                        "S4",
+                        np.uint16,
+                        np.uint16,
+                        np.float64,
+                        np.int64,
+                        np.int32,
+                        np.float32,
+                    ),
+                    "offsets": (0, 4, 8, 12, 14, 16, 24, 32, 36),
+                },
+                align=True,
+            )
 
             # format=0 means float32 data
             # size=50 means (50-10)*1 = 40 float32 samples per chunk
-            record = np.array([
-                (50, 2, b"Dv1A", 1, 0, 0.0, 0, 0, 1000.0),
-                (50, 2, b"Dv1A", 1, 0, 0.04, 160, 0, 1000.0),
-            ], dtype=dtype)
+            record = np.array(
+                [
+                    (50, 2, b"Dv1A", 1, 0, 0.0, 0, 0, 1000.0),
+                    (50, 2, b"Dv1A", 1, 0, 0.04, 160, 0, 1000.0),
+                ],
+                dtype=dtype,
+            )
             record.tofile(str(tsq_path))
 
             # Create TEV file with float32 data
@@ -2902,22 +2903,27 @@ class TestTdtExtractorFullCoverage:
         with tempfile.TemporaryDirectory() as tmpdir:
             tsq_path = Path(tmpdir) / "test.tsq"
 
-            dtype = np.dtype([
-                ("size", np.int32),
-                ("type", np.int32),
-                ("name", "S4"),
-                ("chan", np.uint16),
-                ("sort_code", np.uint16),
-                ("timestamp", np.float64),
-                ("fp_loc", np.int64),
-                ("strobe", np.float64),
-                ("format", np.int32),
-                ("frequency", np.float32),
-            ])
+            dtype = np.dtype(
+                [
+                    ("size", np.int32),
+                    ("type", np.int32),
+                    ("name", "S4"),
+                    ("chan", np.uint16),
+                    ("sort_code", np.uint16),
+                    ("timestamp", np.float64),
+                    ("fp_loc", np.int64),
+                    ("strobe", np.float64),
+                    ("format", np.int32),
+                    ("frequency", np.float32),
+                ]
+            )
 
-            record = np.array([
-                (40, 2, b"Dv1A", 1, 0, 0.0, 40, 0.0, 0, 1000.0),
-            ], dtype=dtype)
+            record = np.array(
+                [
+                    (40, 2, b"Dv1A", 1, 0, 0.0, 40, 0.0, 0, 1000.0),
+                ],
+                dtype=dtype,
+            )
             record.tofile(str(tsq_path))
 
             names, ids = TdtFiberPhotometryExtractor.get_streams(tmpdir)
@@ -2933,21 +2939,41 @@ class TestTdtExtractorFullCoverage:
             tsq_path = Path(tmpdir) / "test.tsq"
             tev_path = Path(tmpdir) / "test.tev"
 
-            dtype = np.dtype({
-                "names": (
-                    "size", "type", "name", "chan", "sort_code",
-                    "timestamp", "fp_loc", "format", "frequency",
-                ),
-                "formats": (
-                    np.int32, np.int32, "S4", np.uint16, np.uint16,
-                    np.float64, np.int64, np.int32, np.float32,
-                ),
-                "offsets": (0, 4, 8, 12, 14, 16, 24, 32, 36),
-            }, align=True)
+            dtype = np.dtype(
+                {
+                    "names": (
+                        "size",
+                        "type",
+                        "name",
+                        "chan",
+                        "sort_code",
+                        "timestamp",
+                        "fp_loc",
+                        "format",
+                        "frequency",
+                    ),
+                    "formats": (
+                        np.int32,
+                        np.int32,
+                        "S4",
+                        np.uint16,
+                        np.uint16,
+                        np.float64,
+                        np.int64,
+                        np.int32,
+                        np.float32,
+                    ),
+                    "offsets": (0, 4, 8, 12, 14, 16, 24, 32, 36),
+                },
+                align=True,
+            )
 
-            record = np.array([
-                (50, 2, b"Dv1A", 1, 0, 0.0, 0, 0, 1000.0),
-            ], dtype=dtype)
+            record = np.array(
+                [
+                    (50, 2, b"Dv1A", 1, 0, 0.0, 0, 0, 1000.0),
+                ],
+                dtype=dtype,
+            )
             record.tofile(str(tsq_path))
 
             data = np.arange(40, dtype=np.float32)
@@ -3036,9 +3062,7 @@ class TestDoricRealFiles:
             self._write_v6_file(doric_path, n_samples=1)
 
             with h5py.File(str(doric_path), "r") as f:
-                data, timestamps, sr = _read_doric_v6_data(
-                    f, "AnalogIn/AIn-1"
-                )
+                data, timestamps, sr = _read_doric_v6_data(f, "AnalogIn/AIn-1")
 
         assert sr == 1.0
 
@@ -3084,9 +3108,7 @@ class TestDoricRealFiles:
                 "DataAcquisition/FPConsole/Signals/Series0001/AnalogIn/AIn-1"
             )
             ain.create_dataset("Values", data=np.arange(float(n_samples)))
-            ain.create_dataset(
-                "Time", data=np.linspace(0.0, 1.0, n_samples)
-            )
+            ain.create_dataset("Time", data=np.linspace(0.0, 1.0, n_samples))
 
 
 class TestNpmBranchCoverage:
@@ -3145,21 +3167,41 @@ class TestTdtBranchCoverage:
             tsq_path = Path(tmpdir) / "test.tsq"
             tev_path = Path(tmpdir) / "test.tev"
 
-            dtype = np.dtype({
-                "names": (
-                    "size", "type", "name", "chan", "sort_code",
-                    "timestamp", "fp_loc", "format", "frequency",
-                ),
-                "formats": (
-                    np.int32, np.int32, "S4", np.uint16, np.uint16,
-                    np.float64, np.int64, np.int32, np.float32,
-                ),
-                "offsets": (0, 4, 8, 12, 14, 16, 24, 32, 36),
-            }, align=True)
+            dtype = np.dtype(
+                {
+                    "names": (
+                        "size",
+                        "type",
+                        "name",
+                        "chan",
+                        "sort_code",
+                        "timestamp",
+                        "fp_loc",
+                        "format",
+                        "frequency",
+                    ),
+                    "formats": (
+                        np.int32,
+                        np.int32,
+                        "S4",
+                        np.uint16,
+                        np.uint16,
+                        np.float64,
+                        np.int64,
+                        np.int32,
+                        np.float32,
+                    ),
+                    "offsets": (0, 4, 8, 12, 14, 16, 24, 32, 36),
+                },
+                align=True,
+            )
 
-            record = np.array([
-                (50, 2, b"Dv1A", 1, 0, 0.0, 0, 0, 1000.0),
-            ], dtype=dtype)
+            record = np.array(
+                [
+                    (50, 2, b"Dv1A", 1, 0, 0.0, 0, 0, 1000.0),
+                ],
+                dtype=dtype,
+            )
             record.tofile(str(tsq_path))
 
             np.arange(40, dtype=np.float32).tofile(str(tev_path))
