@@ -90,7 +90,7 @@ class TestBaseFiberPhotometryExtractor:
             fiber_ids=["f1", "f2", "f3"],
             color="green",
         )
-        segment = NumpyRecordingSegment(traces, sampling_rate)
+        segment = NumpyRecordingSegment(traces, sampling_rate, t_start=0.0)
         rec.add_segment(segment)
 
         # Test 1D times (broadcast to all fibers)
@@ -142,7 +142,7 @@ class TestFiberPhotometryRecordingGroup:
             color="green",
         )
         green.add_segment(
-            NumpyRecordingSegment(np.random.randn(n_samples, 2), sampling_rate)
+            NumpyRecordingSegment(np.random.randn(n_samples, 2), sampling_rate, t_start=0.0)
         )
 
         iso = TestExtractor(
@@ -151,7 +151,7 @@ class TestFiberPhotometryRecordingGroup:
             color="iso",
         )
         iso.add_segment(
-            NumpyRecordingSegment(np.random.randn(n_samples, 2), sampling_rate)
+            NumpyRecordingSegment(np.random.randn(n_samples, 2), sampling_rate, t_start=0.0)
         )
 
         # Create group
@@ -185,14 +185,14 @@ class TestFiberPhotometryRecordingGroup:
             fiber_ids=["f1", "f2"],
             color="green",
         )
-        rec1.add_segment(NumpyRecordingSegment(np.zeros((10, 2)), 100.0))
+        rec1.add_segment(NumpyRecordingSegment(np.zeros((10, 2)), 100.0, t_start=0.0))
 
         rec2 = TestExtractor(
             sampling_frequency=100.0,
             fiber_ids=["f3", "f4"],  # Different fibers!
             color="iso",
         )
-        rec2.add_segment(NumpyRecordingSegment(np.zeros((10, 2)), 100.0))
+        rec2.add_segment(NumpyRecordingSegment(np.zeros((10, 2)), 100.0, t_start=0.0))
 
         with pytest.raises(ValueError, match="different fiber_ids"):
             FiberPhotometryRecordingGroup({"green": rec1, "iso": rec2})
