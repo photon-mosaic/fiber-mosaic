@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
@@ -34,7 +34,7 @@ def _check_pynwb():
         )
 
 
-def _find_nwb_file(folder_path: Union[str, Path]) -> Path:
+def _find_nwb_file(folder_path: str | Path) -> Path:
     """
     Find the single NWB file in a folder.
 
@@ -66,14 +66,15 @@ def _find_nwb_file(folder_path: Union[str, Path]) -> Path:
     if len(nwb_files) == 0:
         raise FileNotFoundError(f"No NWB file found in {folder_path}")
     if len(nwb_files) > 1:
+        names = [f.name for f in nwb_files]
         raise ValueError(
-            f"Multiple NWB files found in {folder_path}: {[f.name for f in nwb_files]}. "
+            f"Multiple NWB files found in {folder_path}: {names}. "
             "Please specify the exact file path."
         )
     return nwb_files[0]
 
 
-def _get_ndx_events_version(io) -> Optional[str]:
+def _get_ndx_events_version(io) -> str | None:
     """Get the ndx-events namespace version from an open NWBHDF5IO."""
     try:
         namespaces = io._file.attrs.get("namespace_versions", {})
@@ -84,7 +85,7 @@ def _get_ndx_events_version(io) -> Optional[str]:
         return None
 
 
-def _discover_fiber_photometry_series(nwbfile) -> Dict[str, Any]:
+def _discover_fiber_photometry_series(nwbfile) -> dict[str, Any]:
     """
     Discover all FiberPhotometryResponseSeries in an NWB file.
 
@@ -97,7 +98,7 @@ def _discover_fiber_photometry_series(nwbfile) -> Dict[str, Any]:
     return series_dict
 
 
-def _resolve_timing(series, n_samples: int) -> Tuple[float, np.ndarray]:
+def _resolve_timing(series, n_samples: int) -> tuple[float, np.ndarray]:
     """
     Resolve timestamps and sampling rate from an NWB series.
 
@@ -106,12 +107,15 @@ def _resolve_timing(series, n_samples: int) -> Tuple[float, np.ndarray]:
     if series.timestamps is not None:
         timestamps = np.array(series.timestamps[:])
         if len(timestamps) > 1:
-            sampling_rate = (len(timestamps) - 1) / (timestamps[-1] - timestamps[0])
+            dt = timestamps[-1] - timestamps[0]
+            sampling_rate = (len(timestamps) - 1) / dt
         else:
-            sampling_rate = series.rate if hasattr(series, "rate") and series.rate else 1.0
+            has_rate = hasattr(series, "rate") and series.rate
+            sampling_rate = series.rate if has_rate else 1.0
     elif hasattr(series, "rate") and series.rate:
         sampling_rate = float(series.rate)
-        t_start = series.starting_time if hasattr(series, "starting_time") else 0.0
+        has_t_start = hasattr(series, "starting_time")
+        t_start = series.starting_time if has_t_start else 0.0
         timestamps = np.arange(n_samples) / sampling_rate + (t_start or 0.0)
     else:
         raise ValueError(
@@ -153,9 +157,9 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
     def __init__(
         self,
-        file_path: Union[str, Path],
-        series_name: Optional[str] = None,
-        color: Optional[str] = None,
+        file_path: str | Path,
+        series_name: str | None = None,
+        color: str | None = None,
     ):
         _check_pynwb()
 
@@ -245,7 +249,7 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
 
     @classmethod
-    def get_streams(cls, file_path: str) -> Tuple[List[str], List[str]]:
+    def get_streams(cls, file_path: str) -> tuple[list[str], list[str]]:
         """
         Discover available FiberPhotometryResponseSeries in an NWB file.
 
@@ -274,9 +278,9 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
 
 def read_nwb_fiber_photometry(
-    file_path: Union[str, Path],
-    series_name: Optional[str] = None,
-    color: Optional[str] = None,
+    file_path: str | Path,
+    series_name: str | None = None,
+    color: str | None = None,
 ) -> NwbFiberPhotometryExtractor:
     """
     Read fiber photometry data from an NWB file.

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -23,7 +22,8 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     """
     Extractor for CSV fiber photometry files.
 
-    Reads CSV files containing timestamps and fluorescence data. The CSV should have:
+    Reads CSV files containing timestamps and fluorescence data. The CSV
+    should have:
     - A time column (default: "time" or "timestamps")
     - One or more data columns (fiber channels)
 
@@ -40,7 +40,8 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         Names of the fiber data columns to read. If None, reads all columns
         except the time column.
     sampling_frequency : float, optional
-        Override the sampling frequency. If None, it's computed from timestamps.
+        Override the sampling frequency. If None, it's computed from
+        timestamps.
 
     Examples
     --------
@@ -50,11 +51,11 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
     def __init__(
         self,
-        file_path: Union[str, Path],
+        file_path: str | Path,
         color: str,
         time_column: str = "time",
-        fiber_columns: Optional[List[str]] = None,
-        sampling_frequency: Optional[float] = None,
+        fiber_columns: list[str] | None = None,
+        sampling_frequency: float | None = None,
     ):
         file_path = Path(file_path)
         if not file_path.exists():
@@ -66,13 +67,17 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
         # Find time column
         time_col = None
-        for candidate in [time_column, "time", "timestamps", "Time", "Timestamps", "Time(s)"]:
+        time_candidates = [
+            time_column, "time", "timestamps", "Time", "Timestamps", "Time(s)"
+        ]
+        for candidate in time_candidates:
             if candidate in columns:
                 time_col = candidate
                 break
         if time_col is None:
             raise ValueError(
-                f"Could not find time column. Tried: {time_column}, time, timestamps. "
+                f"Could not find time column. "
+                f"Tried: {time_column}, time, timestamps. "
                 f"Available columns: {columns}"
             )
 
@@ -91,7 +96,8 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
         # Extract data
         times = df[time_col].to_numpy().astype(np.float64)
-        traces = np.column_stack([df[c].to_numpy() for c in fiber_columns]).astype(np.float64)
+        fiber_data = [df[c].to_numpy() for c in fiber_columns]
+        traces = np.column_stack(fiber_data).astype(np.float64)
 
         # Compute or use provided sampling frequency
         if sampling_frequency is None:
@@ -168,11 +174,11 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
 
 def read_csv_fiber_photometry(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     color: str,
     time_column: str = "time",
-    fiber_columns: Optional[List[str]] = None,
-    sampling_frequency: Optional[float] = None,
+    fiber_columns: list[str] | None = None,
+    sampling_frequency: float | None = None,
 ) -> CsvFiberPhotometryExtractor:
     """
     Read a CSV fiber photometry file.

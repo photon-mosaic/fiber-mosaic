@@ -1,9 +1,9 @@
 """
 Format detection utilities for fiber photometry data.
 
-This module provides utilities to automatically detect which acquisition formats
-are present in a data folder, enabling automatic selection of the appropriate
-extractor.
+This module provides utilities to automatically detect which acquisition
+formats are present in a data folder, enabling automatic selection of the
+appropriate extractor.
 """
 
 from __future__ import annotations
@@ -11,8 +11,6 @@ from __future__ import annotations
 import glob
 import logging
 import os
-from pathlib import Path
-from typing import Set
 
 import numpy as np
 import pandas as pd
@@ -31,7 +29,7 @@ def _is_float(value) -> bool:
 
 def _is_event_csv(path: str) -> bool:
     """
-    Return True if the CSV file is an event CSV (single column named 'timestamps').
+    Return True if the CSV is an event CSV (single column named 'timestamps').
 
     Parameters
     ----------
@@ -84,7 +82,8 @@ def classify_csv_file(path: str) -> str:
     df = pd.read_csv(path, index_col=False)
     colnames = list(df.columns)
 
-    # Doric v2 files store numeric values as column headers; treat as headerless
+    # Doric v2 files store numeric values as column headers; treat as
+    # headerless
     if all(_is_float(c) for c in colnames):
         df = pd.read_csv(path, header=None)
         cols = np.array(list(df.columns), dtype=str)
@@ -93,9 +92,9 @@ def classify_csv_file(path: str) -> str:
 
     if len(cols) == 1:
         if cols[0].lower() != "timestamps":
-            raise ValueError(
-                f"Single-column CSV must have column name 'timestamps', got '{cols[0]}'"
-            )
+            msg = "Single-column CSV must have column name 'timestamps', "
+            msg += f"got '{cols[0]}'"
+            raise ValueError(msg)
         return "csv"
     elif len(cols) == 3:
         arr1 = np.array(["timestamps", "data", "sampling_rate"])
@@ -108,10 +107,57 @@ def classify_csv_file(path: str) -> str:
     elif len(cols) >= 2:
         return "npm"
     else:
-        raise ValueError(f"CSV file has unexpected number of columns: {len(cols)}")
+        msg = f"CSV file has unexpected number of columns: {len(cols)}"
+        raise ValueError(msg)
 
 
-def detect_formats(folder_path: str) -> Set[str]:
+def _detect_binary_formats(folder_path: str, formats: set[str]) -> None:
+    """Detect NWB, TDT, and Doric binary formats in a folder."""
+    if glob.glob(os.path.join(folder_path, "*.nwb")):
+        formats.add("nwb")
+        logger.debug("Found NWB files in %s", folder_path)
+
+    if glob.glob(os.path.join(folder_path, "*.tsq")):
+        formats.add("tdt")
+        logger.debug("Found TDT files in %s", folder_path)
+
+    if glob.glob(os.path.join(folder_path, "*.doric")):
+        formats.add("doric")
+        logger.debug("Found Doric files in %s", folder_path)
+
+
+def _classify_csv_files(
+    non_event_csv_paths: list[str],
+    folder_path: str,
+    formats: set[str],
+) -> bool:
+    """Classify non-event CSV files and update formats set. Returns has_npm."""
+    if not non_event_csv_paths:
+        return False
+
+    labels = set()
+    for p in non_event_csv_paths:
+        try:
+            labels.add(classify_csv_file(p))
+        except Exception as e:
+            logger.warning("Could not classify CSV file %s: %s", p, e)
+
+    has_npm_data = False
+    if "npm" in labels:
+        formats.add("npm")
+        has_npm_data = True
+        logger.debug("Found NPM CSV files in %s", folder_path)
+    if "doric" in labels:
+        formats.add("doric")
+        logger.debug("Found Doric CSV files in %s", folder_path)
+    if not has_npm_data and "csv" in labels:
+        formats.add("csv")
+        logger.debug("Found standard CSV files in %s", folder_path)
+
+    return has_npm_data
+
+
+def detect_formats(folder_path: str) -> set[str]:
     """
     Detect all acquisition formats present in a session folder.
 
@@ -127,7 +173,8 @@ def detect_formats(folder_path: str) -> Set[str]:
     -------
     set of str
         Format strings for all sources found in the folder.
-        Possible elements: ``"nwb"``, ``"tdt"``, ``"doric"``, ``"csv"``, ``"npm"``.
+        Possible elements: ``"nwb"``, ``"tdt"``, ``"doric"``, ``"csv"``,
+        ``"npm"``.
 
     Examples
     --------
@@ -136,53 +183,22 @@ def detect_formats(folder_path: str) -> Set[str]:
     ...     recording = read_nwb_fiber_photometry(...)
     """
     folder_path = str(folder_path)
-    formats: Set[str] = set()
+    formats: set[str] = set()
 
-    # NWB .nwb files
-    if glob.glob(os.path.join(folder_path, "*.nwb")):
-        formats.add("nwb")
-        logger.debug("Found NWB files in %s", folder_path)
-
-    # TDT .tsq files (binary header)
-    if glob.glob(os.path.join(folder_path, "*.tsq")):
-        formats.add("tdt")
-        logger.debug("Found TDT files in %s", folder_path)
-
-    # Doric .doric files
-    if glob.glob(os.path.join(folder_path, "*.doric")):
-        formats.add("doric")
-        logger.debug("Found Doric files in %s", folder_path)
+    # Detect binary formats
+    _detect_binary_formats(folder_path, formats)
 
     # Process CSV files
     csv_paths = glob.glob(os.path.join(folder_path, "*.csv"))
-
-    # Multi-column CSV files can be NPM, Doric CSV exports, or 3-column data_csv files
     non_event_csv_paths = [p for p in csv_paths if not _is_event_csv(p)]
-    has_npm_data = False
+    has_npm_data = _classify_csv_files(
+        non_event_csv_paths, folder_path, formats
+    )
 
-    if non_event_csv_paths:
-        labels = set()
-        for p in non_event_csv_paths:
-            try:
-                labels.add(classify_csv_file(p))
-            except Exception as e:
-                logger.warning("Could not classify CSV file %s: %s", p, e)
-
-        if "npm" in labels:
-            formats.add("npm")
-            has_npm_data = True
-            logger.debug("Found NPM CSV files in %s", folder_path)
-        if "doric" in labels:
-            formats.add("doric")
-            logger.debug("Found Doric CSV files in %s", folder_path)
-        if not has_npm_data and "csv" in labels:
-            formats.add("csv")
-            logger.debug("Found standard CSV files in %s", folder_path)
-
-    # Single-column timestamp CSVs provide external event timestamps
-    # When NPM data is present, suppress NPM-generated split-event files (event*.csv)
+    # Handle event CSV files
     event_csv_paths = [p for p in csv_paths if _is_event_csv(p)]
     if has_npm_data:
+        # Suppress NPM-generated split-event files (event*.csv)
         external_event_csv_paths = [
             p for p in event_csv_paths
             if not os.path.basename(p).startswith("event")

@@ -6,11 +6,9 @@ Reads TDT binary format files (.tsq and .tev files).
 
 from __future__ import annotations
 
-import glob
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -22,7 +20,7 @@ from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
 logger = logging.getLogger(__name__)
 
 
-def _read_tsq(folder_path: Union[str, Path]) -> Tuple[Optional[pd.DataFrame], bool]:
+def _read_tsq(folder_path: str | Path) -> tuple[pd.DataFrame | None, bool]:
     """
     Read TDT header file (.tsq).
 
@@ -42,7 +40,10 @@ def _read_tsq(folder_path: Union[str, Path]) -> Tuple[Optional[pd.DataFrame], bo
         "size", "type", "name", "chan", "sort_code",
         "timestamp", "fp_loc", "strobe", "format", "frequency"
     )
-    formats = (int32, int32, "S4", uint16, uint16, float64, int64, float64, int32, float32)
+    formats = (
+        int32, int32, "S4", uint16, uint16,
+        float64, int64, float64, int32, float32
+    )
     offsets = (0, 4, 8, 12, 14, 16, 24, 24, 32, 36)
     tsq_dtype = np.dtype(
         {"names": names, "formats": formats, "offsets": offsets},
@@ -65,7 +66,7 @@ def _read_tsq(folder_path: Union[str, Path]) -> Tuple[Optional[pd.DataFrame], bo
     return df, True
 
 
-def _get_store_names(header_df: pd.DataFrame) -> List[str]:
+def _get_store_names(header_df: pd.DataFrame) -> list[str]:
     """Extract unique store names from TSQ header."""
     header_df = header_df.copy()
     header_df["name"] = np.asarray(header_df["name"], dtype=str)
@@ -80,11 +81,12 @@ def _read_tev_store(
     folder_path: Path,
     header_df: pd.DataFrame,
     store_name: str
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """
     Read data for a specific store from TDT TEV file.
 
-    Returns a dict with keys: storename, sampling_rate, timestamps, data, channels, npoints
+    Returns a dict with keys: storename, sampling_rate, timestamps, data,
+    channels, npoints.
     """
     tev_files = list(folder_path.glob("*.tev"))
     if len(tev_files) > 1:
@@ -130,7 +132,8 @@ def _read_tev_store(
 
     if format_code != 5:
         # Continuous data
-        nsample = (data_size[first_row] - 10) * int(format_table[format_code][2])
+        multiplier = int(format_table[format_code][2])
+        nsample = (data_size[first_row] - 10) * multiplier
         store_data = np.zeros((len(fp_loc), nsample))
 
         with open(tev_path, "rb") as fp:
@@ -164,8 +167,8 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     folder_path : str or Path
         Path to folder containing TDT files (.tsq and .tev).
     store_name : str, optional
-        Name of the store to read. If None and only one photometry store exists,
-        it will be used automatically.
+        Name of the store to read. If None and only one photometry store
+        exists, it will be used automatically.
     color : str, optional
         Color/wavelength identifier. If None, uses the store name.
 
@@ -184,9 +187,9 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
     def __init__(
         self,
-        folder_path: Union[str, Path],
-        store_name: Optional[str] = None,
-        color: Optional[str] = None,
+        folder_path: str | Path,
+        store_name: str | None = None,
+        color: str | None = None,
     ):
         folder_path = Path(folder_path)
 
@@ -199,7 +202,8 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         store_names = _get_store_names(header_df)
 
         if not store_names:
-            raise ValueError(f"No valid stores found in TDT files at {folder_path}")
+            msg = f"No valid stores found in TDT files at {folder_path}"
+            raise ValueError(msg)
 
         # Select store
         if store_name is None:
@@ -207,7 +211,8 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
                 store_name = store_names[0]
             else:
                 raise ValueError(
-                    f"Multiple stores found: {store_names}. Please specify store_name."
+                    f"Multiple stores found: {store_names}. "
+                    "Please specify store_name."
                 )
 
         if store_name not in store_names:
@@ -221,8 +226,9 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         # Check if this is event/strobe data (no continuous samples)
         if store_data["npoints"] == 1:
             raise ValueError(
-                f"Store '{store_name}' is an event/strobe store, not continuous data. "
-                "Use a different extractor for event data."
+                f"Store '{store_name}' is an event/strobe store, "
+                "not continuous data. Use a different extractor for "
+                "event data."
             )
 
         # Extract timing and data
@@ -287,7 +293,7 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
 
     @classmethod
-    def get_streams(cls, folder_path: str) -> Tuple[List[str], List[str]]:
+    def get_streams(cls, folder_path: str) -> tuple[list[str], list[str]]:
         """
         Discover available stores in a TDT folder.
 
@@ -312,9 +318,9 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
 
 def read_tdt_fiber_photometry(
-    folder_path: Union[str, Path],
-    store_name: Optional[str] = None,
-    color: Optional[str] = None,
+    folder_path: str | Path,
+    store_name: str | None = None,
+    color: str | None = None,
 ) -> TdtFiberPhotometryExtractor:
     """
     Read fiber photometry data from TDT files.

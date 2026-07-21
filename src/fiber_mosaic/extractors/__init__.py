@@ -27,17 +27,32 @@ Usage:
     recording = read_csv_fiber_photometry("data.csv", color="green")
 """
 
-from .detect_formats import detect_formats
-from .csv_extractor import CsvFiberPhotometryExtractor, read_csv_fiber_photometry
-from .nwb_extractor import NwbFiberPhotometryExtractor, read_nwb_fiber_photometry
-from .tdt_extractor import TdtFiberPhotometryExtractor, read_tdt_fiber_photometry
-from .doric_extractor import DoricFiberPhotometryExtractor, read_doric_fiber_photometry
-from .npm_extractor import NpmFiberPhotometryExtractor, read_npm_fiber_photometry
+from .csv_extractor import (
+    CsvFiberPhotometryExtractor,
+    read_csv_fiber_photometry,
+)
 from .dandi_extractor import (
     DandiFiberPhotometryExtractor,
-    read_dandi_fiber_photometry,
     is_dandi_uri,
     parse_dandi_uri,
+    read_dandi_fiber_photometry,
+)
+from .detect_formats import detect_formats
+from .doric_extractor import (
+    DoricFiberPhotometryExtractor,
+    read_doric_fiber_photometry,
+)
+from .npm_extractor import (
+    NpmFiberPhotometryExtractor,
+    read_npm_fiber_photometry,
+)
+from .nwb_extractor import (
+    NwbFiberPhotometryExtractor,
+    read_nwb_fiber_photometry,
+)
+from .tdt_extractor import (
+    TdtFiberPhotometryExtractor,
+    read_tdt_fiber_photometry,
 )
 
 __all__ = [

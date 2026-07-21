@@ -6,11 +6,8 @@ Reads Doric Neuroscience .doric files and CSV exports.
 
 from __future__ import annotations
 
-import glob
 import logging
-import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -37,7 +34,7 @@ def _check_h5py():
         )
 
 
-def _find_doric_files(folder_path: Path) -> Tuple[List[Path], List[Path]]:
+def _find_doric_files(folder_path: Path) -> tuple[list[Path], list[Path]]:
     """Find .doric and Doric CSV files in a folder."""
     doric_files = list(folder_path.glob("*.doric"))
     csv_files = list(folder_path.glob("*.csv"))
@@ -46,7 +43,9 @@ def _find_doric_files(folder_path: Path) -> Tuple[List[Path], List[Path]]:
     doric_csv_files = []
     for csv_path in csv_files:
         try:
-            df = pd.read_csv(csv_path, header=None, nrows=2, index_col=False, dtype=str)
+            df = pd.read_csv(
+                csv_path, header=None, nrows=2, index_col=False, dtype=str
+            )
             df = df.dropna(axis=1, how="all")
             df_arr = np.array(df).flatten()
             # Doric CSVs have all-string first rows
@@ -68,7 +67,7 @@ def _is_float(value) -> bool:
         return False
 
 
-def _read_doric_v1_keys(h5file) -> List[str]:
+def _read_doric_v1_keys(h5file) -> list[str]:
     """Read signal keys from Doric V1 format."""
     if "Traces" not in h5file or "Console" not in h5file["Traces"]:
         return []
@@ -78,7 +77,7 @@ def _read_doric_v1_keys(h5file) -> List[str]:
     return keys
 
 
-def _read_doric_v6_keys(h5file) -> List[str]:
+def _read_doric_v6_keys(h5file) -> list[str]:
     """Read signal keys from Doric V6 format."""
     if "DataAcquisition" not in h5file:
         return []
@@ -106,7 +105,7 @@ def _read_doric_v6_keys(h5file) -> List[str]:
     return keys
 
 
-def _discover_doric_file_streams(file_path: Path) -> List[str]:
+def _discover_doric_file_streams(file_path: Path) -> list[str]:
     """Discover available streams in a .doric file."""
     _check_h5py()
 
@@ -124,7 +123,7 @@ def _discover_doric_file_streams(file_path: Path) -> List[str]:
             return []
 
 
-def _discover_doric_csv_streams(file_path: Path) -> List[str]:
+def _discover_doric_csv_streams(file_path: Path) -> list[str]:
     """Discover available streams in a Doric CSV file."""
     df = pd.read_csv(file_path, header=1, index_col=False, nrows=0)
     columns = list(df.columns)
@@ -135,7 +134,7 @@ def _discover_doric_csv_streams(file_path: Path) -> List[str]:
 def _read_doric_v1_data(
     h5file,
     stream_name: str
-) -> Tuple[np.ndarray, np.ndarray, float]:
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Read data from Doric V1 format."""
     console = h5file["Traces"]["Console"]
     timestamps = np.array(console["Time(s)"][:])
@@ -149,59 +148,58 @@ def _read_doric_v1_data(
     return data, timestamps, sampling_rate
 
 
+def _find_v6_group(group, target_parts):
+    """Recursively find the group containing data for target path parts."""
+    for key in group.keys():
+        item = group[key]
+        if isinstance(item, h5py.Group):
+            if len(target_parts) > 0 and key == target_parts[0]:
+                if len(target_parts) == 1:
+                    return item
+                return _find_v6_group(item, target_parts[1:])
+            result = _find_v6_group(item, target_parts)
+            if result is not None:
+                return result
+    return None
+
+
+def _extract_v6_data(data_group, stream_name: str) -> np.ndarray:
+    """Extract data array from a Doric V6 data group."""
+    if "Values" in data_group:
+        return np.array(data_group["Values"][:])
+
+    for key in data_group.keys():
+        if isinstance(data_group[key], h5py.Dataset) and key != "Time":
+            return np.array(data_group[key][:])
+
+    raise ValueError(f"No data found in stream: {stream_name}")
+
+
+def _extract_v6_timestamps(data_group, data_len: int) -> np.ndarray:
+    """Extract timestamps from a Doric V6 data group."""
+    if "Time" in data_group:
+        return np.array(data_group["Time"][:])
+
+    parent = data_group.parent
+    if "Time" in parent:
+        return np.array(parent["Time"][:])
+
+    return np.arange(data_len)
+
+
 def _read_doric_v6_data(
     h5file,
     stream_name: str
-) -> Tuple[np.ndarray, np.ndarray, float]:
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Read data from Doric V6 format."""
-    # Navigate to the data location
     parts = stream_name.split("/")
-
-    # Find the data in DataAcquisition
-    def find_group(group, target_parts):
-        """Recursively find the group containing our data."""
-        for key in group.keys():
-            item = group[key]
-            if isinstance(item, h5py.Group):
-                # Check if this group name matches part of our path
-                if len(target_parts) > 0 and key == target_parts[0]:
-                    if len(target_parts) == 1:
-                        return item
-                    return find_group(item, target_parts[1:])
-                # Also try recursive search
-                result = find_group(item, target_parts)
-                if result is not None:
-                    return result
-        return None
-
-    data_group = find_group(h5file["DataAcquisition"], parts)
+    data_group = _find_v6_group(h5file["DataAcquisition"], parts)
 
     if data_group is None:
         raise ValueError(f"Could not find data for stream: {stream_name}")
 
-    # Look for Values or direct data
-    if "Values" in data_group:
-        data = np.array(data_group["Values"][:])
-    else:
-        # Try to find the data dataset
-        for key in data_group.keys():
-            if isinstance(data_group[key], h5py.Dataset) and key != "Time":
-                data = np.array(data_group[key][:])
-                break
-        else:
-            raise ValueError(f"No data found in stream: {stream_name}")
-
-    # Find timestamps
-    if "Time" in data_group:
-        timestamps = np.array(data_group["Time"][:])
-    else:
-        # Try parent group
-        parent = data_group.parent
-        if "Time" in parent:
-            timestamps = np.array(parent["Time"][:])
-        else:
-            # Generate from sampling rate if available
-            timestamps = np.arange(len(data))
+    data = _extract_v6_data(data_group, stream_name)
+    timestamps = _extract_v6_timestamps(data_group, len(data))
 
     if len(timestamps) > 1:
         sampling_rate = 1.0 / np.median(np.diff(timestamps))
@@ -214,7 +212,7 @@ def _read_doric_v6_data(
 def _read_doric_csv_data(
     file_path: Path,
     stream_name: str
-) -> Tuple[np.ndarray, np.ndarray, float]:
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Read data from Doric CSV file."""
     df = pd.read_csv(file_path, header=1, index_col=False)
     df = df.dropna(axis=1, how="all")
@@ -239,6 +237,52 @@ def _read_doric_csv_data(
     return data, timestamps, sampling_rate
 
 
+def _resolve_doric_path(file_path: Path) -> Path:
+    """Resolve a directory path to a specific Doric file."""
+    if not file_path.is_dir():
+        return file_path
+
+    doric_files, csv_files = _find_doric_files(file_path)
+    if doric_files:
+        return doric_files[0]
+    if csv_files:
+        return csv_files[0]
+    raise FileNotFoundError(f"No Doric files found in {file_path}")
+
+
+def _select_doric_stream(
+    stream_name: str | None,
+    available_streams: list[str],
+) -> str:
+    """Select a stream from available streams."""
+    if stream_name is None:
+        if len(available_streams) == 1:
+            return available_streams[0]
+        raise ValueError(
+            f"Multiple streams found: {available_streams}. "
+            "Please specify stream_name."
+        )
+
+    if stream_name not in available_streams:
+        raise ValueError(
+            f"Stream '{stream_name}' not found. "
+            f"Available: {available_streams}"
+        )
+    return stream_name
+
+
+def _read_doric_file_data(
+    file_path: Path,
+    stream_name: str,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Read data from a .doric HDF5 file."""
+    with h5py.File(str(file_path), "r") as f:
+        top_keys = list(f.keys())
+        if "Traces" in top_keys:
+            return _read_doric_v1_data(f, stream_name)
+        return _read_doric_v6_data(f, stream_name)
+
+
 class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     """
     Extractor for Doric Neuroscience fiber photometry files.
@@ -248,7 +292,8 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     Parameters
     ----------
     file_path : str or Path
-        Path to the .doric file, Doric CSV file, or folder containing such files.
+        Path to the .doric file, Doric CSV file, or folder containing
+        such files.
     stream_name : str, optional
         Name of the stream to read. If None and only one stream exists,
         it will be used automatically.
@@ -258,7 +303,10 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     Examples
     --------
     >>> # List available streams
-    >>> names, ids = DoricFiberPhotometryExtractor.get_streams("/path/to/data.doric")
+    >>> streams = DoricFiberPhotometryExtractor.get_streams(
+    ...     "/path/to/data.doric"
+    ... )
+    >>> names, ids = streams
 
     >>> # Read a specific stream
     >>> recording = DoricFiberPhotometryExtractor(
@@ -270,22 +318,11 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
     def __init__(
         self,
-        file_path: Union[str, Path],
-        stream_name: Optional[str] = None,
-        color: Optional[str] = None,
+        file_path: str | Path,
+        stream_name: str | None = None,
+        color: str | None = None,
     ):
-        file_path = Path(file_path)
-
-        # Determine file type
-        if file_path.is_dir():
-            doric_files, csv_files = _find_doric_files(file_path)
-            if doric_files:
-                file_path = doric_files[0]
-            elif csv_files:
-                file_path = csv_files[0]
-            else:
-                raise FileNotFoundError(f"No Doric files found in {file_path}")
-
+        file_path = _resolve_doric_path(Path(file_path))
         is_doric_file = file_path.suffix == ".doric"
 
         # Discover streams
@@ -298,31 +335,17 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         if not available_streams:
             raise ValueError(f"No streams found in {file_path}")
 
-        # Select stream
-        if stream_name is None:
-            if len(available_streams) == 1:
-                stream_name = available_streams[0]
-            else:
-                raise ValueError(
-                    f"Multiple streams found: {available_streams}. "
-                    "Please specify stream_name."
-                )
-
-        if stream_name not in available_streams:
-            raise ValueError(
-                f"Stream '{stream_name}' not found. Available: {available_streams}"
-            )
+        stream_name = _select_doric_stream(stream_name, available_streams)
 
         # Read data
         if is_doric_file:
-            with h5py.File(str(file_path), "r") as f:
-                top_keys = list(f.keys())
-                if "Traces" in top_keys:
-                    data, timestamps, sampling_rate = _read_doric_v1_data(f, stream_name)
-                else:
-                    data, timestamps, sampling_rate = _read_doric_v6_data(f, stream_name)
+            data, timestamps, sampling_rate = _read_doric_file_data(
+                file_path, stream_name
+            )
         else:
-            data, timestamps, sampling_rate = _read_doric_csv_data(file_path, stream_name)
+            data, timestamps, sampling_rate = _read_doric_csv_data(
+                file_path, stream_name
+            )
 
         # Ensure data is 2D
         if data.ndim == 1:
@@ -370,7 +393,7 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
 
     @classmethod
-    def get_streams(cls, file_path: str) -> Tuple[List[str], List[str]]:
+    def get_streams(cls, file_path: str) -> tuple[list[str], list[str]]:
         """
         Discover available streams in a Doric file.
 
@@ -406,9 +429,9 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
 
 def read_doric_fiber_photometry(
-    file_path: Union[str, Path],
-    stream_name: Optional[str] = None,
-    color: Optional[str] = None,
+    file_path: str | Path,
+    stream_name: str | None = None,
+    color: str | None = None,
 ) -> DoricFiberPhotometryExtractor:
     """
     Read fiber photometry data from a Doric file.

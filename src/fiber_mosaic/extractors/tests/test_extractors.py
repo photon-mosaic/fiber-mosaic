@@ -2,10 +2,11 @@
 Tests for fiber-mosaic extractors.
 """
 
-import numpy as np
-import pytest
 import tempfile
 from pathlib import Path
+
+import numpy as np
+import pytest
 
 
 class TestCsvExtractor:
@@ -16,10 +17,13 @@ class TestCsvExtractor:
         from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
 
         # Create test CSV file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as f:
             f.write("time,fiber1,fiber2\n")
             for i in range(100):
-                f.write(f"{i * 0.01},{np.random.randn()},{np.random.randn()}\n")
+                r1, r2 = np.random.randn(), np.random.randn()
+                f.write(f"{i * 0.01},{r1},{r2}\n")
             csv_path = f.name
 
         try:
@@ -47,7 +51,9 @@ class TestCsvExtractor:
         """Test stream discovery."""
         from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as f:
             f.write("time,signal,control\n")
             f.write("0,1.0,0.5\n")
             csv_path = f.name
@@ -65,8 +71,9 @@ class TestBaseFiberPhotometryExtractor:
 
     def test_per_fiber_times(self):
         """Test per-fiber timestamp handling."""
-        from fiber_mosaic import BaseFiberPhotometryExtractor
         from spikeinterface.core.numpyextractors import NumpyRecordingSegment
+
+        from fiber_mosaic import BaseFiberPhotometryExtractor
 
         # Create simple recording
         n_samples = 100
@@ -112,11 +119,12 @@ class TestFiberPhotometryRecordingGroup:
 
     def test_group_creation(self):
         """Test creating a recording group."""
+        from spikeinterface.core.numpyextractors import NumpyRecordingSegment
+
         from fiber_mosaic import (
             BaseFiberPhotometryExtractor,
             FiberPhotometryRecordingGroup,
         )
-        from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
         # Create two recordings with same fibers
         n_samples = 100
@@ -160,11 +168,12 @@ class TestFiberPhotometryRecordingGroup:
 
     def test_group_fiber_validation(self):
         """Test that mismatched fiber IDs raise error."""
+        from spikeinterface.core.numpyextractors import NumpyRecordingSegment
+
         from fiber_mosaic import (
             BaseFiberPhotometryExtractor,
             FiberPhotometryRecordingGroup,
         )
-        from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
         class TestExtractor(BaseFiberPhotometryExtractor):
             pass

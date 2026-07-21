@@ -8,7 +8,6 @@ downloading the entire file.
 from __future__ import annotations
 
 import logging
-from typing import List, Optional, Tuple, Union
 
 import numpy as np
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
@@ -44,7 +43,7 @@ def is_dandi_uri(path: str) -> bool:
     return isinstance(path, str) and path.startswith(DANDI_URI_PREFIX)
 
 
-def parse_dandi_uri(uri: str) -> Tuple[str, str]:
+def parse_dandi_uri(uri: str) -> tuple[str, str]:
     """
     Parse a DANDI URI into its dandiset ID and asset path.
 
@@ -95,22 +94,22 @@ def _check_dandi_dependencies():
     missing = []
 
     try:
-        import dandi
+        import dandi  # noqa: F401
     except ImportError:
         missing.append("dandi")
 
     try:
-        import remfile
+        import remfile  # noqa: F401
     except ImportError:
         missing.append("remfile")
 
     try:
-        import h5py
+        import h5py  # noqa: F401
     except ImportError:
         missing.append("h5py")
 
     try:
-        from pynwb import NWBHDF5IO
+        from pynwb import NWBHDF5IO  # noqa: F401
     except ImportError:
         missing.append("pynwb")
 
@@ -149,7 +148,9 @@ def _stream_nwb(dandiset_id: str, asset_path: str):
         try:
             client.dandi_authenticate()
         except Exception:
-            logger.debug("DANDI authentication failed, proceeding without auth")
+            logger.debug(
+                "DANDI authentication failed, proceeding without auth"
+            )
 
         dandiset = client.get_dandiset(dandiset_id, "draft")
         asset = dandiset.get_asset_by_path(asset_path)
@@ -173,20 +174,24 @@ def _discover_fiber_photometry_series(nwbfile) -> dict:
     return series_dict
 
 
-def _resolve_timing(series, n_samples: int) -> Tuple[float, np.ndarray]:
+def _resolve_timing(series, n_samples: int) -> tuple[float, np.ndarray]:
     """Resolve timestamps and sampling rate from an NWB series."""
     if series.timestamps is not None:
         timestamps = np.array(series.timestamps[:])
         if len(timestamps) > 1:
-            sampling_rate = (len(timestamps) - 1) / (timestamps[-1] - timestamps[0])
+            dt = timestamps[-1] - timestamps[0]
+            sampling_rate = (len(timestamps) - 1) / dt
         else:
-            sampling_rate = series.rate if hasattr(series, "rate") and series.rate else 1.0
+            has_rate = hasattr(series, "rate") and series.rate
+            sampling_rate = series.rate if has_rate else 1.0
     elif hasattr(series, "rate") and series.rate:
         sampling_rate = float(series.rate)
-        t_start = series.starting_time if hasattr(series, "starting_time") else 0.0
+        has_t_start = hasattr(series, "starting_time")
+        t_start = series.starting_time if has_t_start else 0.0
         timestamps = np.arange(n_samples) / sampling_rate + (t_start or 0.0)
     else:
-        raise ValueError(f"Series {series.name} has neither timestamps nor rate")
+        msg = f"Series {series.name} has neither timestamps nor rate"
+        raise ValueError(msg)
 
     return sampling_rate, timestamps
 
@@ -225,8 +230,8 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     def __init__(
         self,
         dandi_uri: str,
-        series_name: Optional[str] = None,
-        color: Optional[str] = None,
+        series_name: str | None = None,
+        color: str | None = None,
     ):
         _check_dandi_dependencies()
 
@@ -317,7 +322,8 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         }
 
         logger.info(
-            "Loaded DANDI stream %s, series '%s': %d fibers, %d samples, %.2f Hz",
+            "Loaded DANDI stream %s, series '%s': "
+            "%d fibers, %d samples, %.2f Hz",
             dandi_uri,
             series_name,
             len(fiber_ids),
@@ -326,9 +332,9 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
 
     @classmethod
-    def get_streams(cls, dandi_uri: str) -> Tuple[List[str], List[str]]:
+    def get_streams(cls, dandi_uri: str) -> tuple[list[str], list[str]]:
         """
-        Discover available FiberPhotometryResponseSeries in a DANDI-hosted NWB file.
+        Discover available FiberPhotometryResponseSeries in a DANDI NWB file.
 
         Parameters
         ----------
@@ -361,8 +367,8 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
 def read_dandi_fiber_photometry(
     dandi_uri: str,
-    series_name: Optional[str] = None,
-    color: Optional[str] = None,
+    series_name: str | None = None,
+    color: str | None = None,
 ) -> DandiFiberPhotometryExtractor:
     """
     Read fiber photometry data from the DANDI Archive.

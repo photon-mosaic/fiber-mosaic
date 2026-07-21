@@ -6,11 +6,8 @@ Reads Neurophotometrics multi-channel CSV files with interleaved LED states.
 
 from __future__ import annotations
 
-import glob
 import logging
-import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -21,14 +18,15 @@ from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
 logger = logging.getLogger(__name__)
 
 
-def _find_npm_csv(folder_path: Path) -> Optional[Path]:
+def _find_npm_csv(folder_path: Path) -> Path | None:
     """Find NPM CSV file in a folder."""
     csv_files = list(folder_path.glob("*.csv"))
 
     for csv_path in csv_files:
         # Skip event files and files with specific prefixes
         basename = csv_path.name.lower()
-        if any(basename.startswith(prefix) for prefix in ["event", "chev", "chod", "chpr"]):
+        skip_prefixes = ["event", "chev", "chod", "chpr"]
+        if any(basename.startswith(prefix) for prefix in skip_prefixes):
             continue
 
         try:
@@ -50,7 +48,7 @@ def _find_npm_csv(folder_path: Path) -> Optional[Path]:
     return None
 
 
-def _discover_npm_streams(file_path: Path) -> Tuple[List[str], Dict[str, int]]:
+def _discover_npm_streams(file_path: Path) -> tuple[list[str], dict[str, int]]:
     """
     Discover available channels and LED states in NPM file.
 
@@ -91,11 +89,34 @@ def _discover_npm_streams(file_path: Path) -> Tuple[List[str], Dict[str, int]]:
     return streams, led_mapping
 
 
+def _find_npm_column(columns: list[str], candidates: list[str]) -> str | None:
+    """Find a column matching one of the candidate names (case-insensitive)."""
+    for col in columns:
+        if col.lower() in candidates:
+            return col
+    return None
+
+
+def _extract_npm_timestamps(
+    df_filtered: pd.DataFrame,
+    ts_col: str | None,
+) -> np.ndarray:
+    """Extract timestamps from filtered NPM dataframe."""
+    if ts_col is None:
+        return np.arange(len(df_filtered))
+
+    timestamps = df_filtered[ts_col].to_numpy()
+    # Check if timestamps are in milliseconds
+    if ts_col.lower() == "timestamp" and timestamps.max() > 1e6:
+        timestamps = timestamps / 1000.0
+    return timestamps
+
+
 def _read_npm_data(
     file_path: Path,
     column_name: str,
     led_state: int,
-) -> Tuple[np.ndarray, np.ndarray, float]:
+) -> tuple[np.ndarray, np.ndarray, float]:
     """
     Read data for a specific channel and LED state from NPM file.
 
@@ -120,26 +141,11 @@ def _read_npm_data(
     df = pd.read_csv(file_path, index_col=False)
     columns = list(df.columns)
 
-    # Find LED state column
-    led_col = None
-    for col in columns:
-        if col.lower() in ["ledstate", "flags", "led"]:
-            led_col = col
-            break
-
-    # Find timestamp column
-    ts_col = None
-    for col in columns:
-        if col.lower() in ["timestamp", "timestamps", "time"]:
-            ts_col = col
-            break
-
+    # Find LED state and timestamp columns
+    led_col = _find_npm_column(columns, ["ledstate", "flags", "led"])
+    ts_col = _find_npm_column(columns, ["timestamp", "timestamps", "time"])
     if ts_col is None:
-        # Use frame counter if available
-        for col in columns:
-            if col.lower() == "framecounter":
-                ts_col = col
-                break
+        ts_col = _find_npm_column(columns, ["framecounter"])
 
     # Filter by LED state
     if led_col:
@@ -148,25 +154,20 @@ def _read_npm_data(
     else:
         df_filtered = df.copy()
 
-    # Extract data
+    # Extract data and timestamps
     data = df_filtered[column_name].to_numpy()
-
-    # Extract timestamps
-    if ts_col:
-        timestamps = df_filtered[ts_col].to_numpy()
-        # Check if timestamps are in milliseconds
-        if ts_col.lower() == "timestamp" and timestamps.max() > 1e6:
-            timestamps = timestamps / 1000.0  # Convert to seconds
-    else:
-        timestamps = np.arange(len(data))
+    timestamps = _extract_npm_timestamps(df_filtered, ts_col)
 
     # Calculate sampling rate
     if len(timestamps) > 1:
-        sampling_rate = (len(timestamps) - 1) / (timestamps[-1] - timestamps[0])
+        dt = timestamps[-1] - timestamps[0]
+        sampling_rate = (len(timestamps) - 1) / dt
     else:
         sampling_rate = 1.0
 
-    return data.astype(np.float64), timestamps.astype(np.float64), sampling_rate
+    data_out = data.astype(np.float64)
+    ts_out = timestamps.astype(np.float64)
+    return data_out, ts_out, sampling_rate
 
 
 class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
@@ -174,7 +175,8 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     Extractor for Neurophotometrics (NPM) fiber photometry files.
 
     Reads multi-channel NPM CSV files with interleaved LED states.
-    Each LED state (signal, control/isosbestic) is treated as a separate stream.
+    Each LED state (signal, control/isosbestic) is treated as a separate
+    stream.
 
     Parameters
     ----------
@@ -189,7 +191,8 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     Examples
     --------
     >>> # List available streams
-    >>> names, ids = NpmFiberPhotometryExtractor.get_streams("/path/to/npm.csv")
+    >>> streams = NpmFiberPhotometryExtractor.get_streams("/path/to/npm.csv")
+    >>> names, ids = streams
 
     >>> # Read signal channel (LED state 2 is typically 470nm signal)
     >>> recording = NpmFiberPhotometryExtractor(
@@ -208,9 +211,9 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
     def __init__(
         self,
-        file_path: Union[str, Path],
-        stream_name: Optional[str] = None,
-        color: Optional[str] = None,
+        file_path: str | Path,
+        stream_name: str | None = None,
+        color: str | None = None,
     ):
         file_path = Path(file_path)
 
@@ -218,7 +221,8 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         if file_path.is_dir():
             npm_file = _find_npm_csv(file_path)
             if npm_file is None:
-                raise FileNotFoundError(f"No NPM CSV file found in {file_path}")
+                msg = f"No NPM CSV file found in {file_path}"
+                raise FileNotFoundError(msg)
             file_path = npm_file
         elif not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -241,7 +245,8 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
         if stream_name not in available_streams:
             raise ValueError(
-                f"Stream '{stream_name}' not found. Available: {available_streams}"
+                f"Stream '{stream_name}' not found. "
+                f"Available: {available_streams}"
             )
 
         # Get column and LED state
@@ -298,7 +303,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
 
     @classmethod
-    def get_streams(cls, file_path: str) -> Tuple[List[str], List[str]]:
+    def get_streams(cls, file_path: str) -> tuple[list[str], list[str]]:
         """
         Discover available streams in an NPM file.
 
@@ -327,9 +332,9 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
 
 def read_npm_fiber_photometry(
-    file_path: Union[str, Path],
-    stream_name: Optional[str] = None,
-    color: Optional[str] = None,
+    file_path: str | Path,
+    stream_name: str | None = None,
+    color: str | None = None,
 ) -> NpmFiberPhotometryExtractor:
     """
     Read fiber photometry data from an NPM (Neurophotometrics) file.
