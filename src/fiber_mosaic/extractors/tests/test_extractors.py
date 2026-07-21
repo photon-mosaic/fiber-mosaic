@@ -1499,7 +1499,8 @@ class TestDoricHDF5Mock:
         from fiber_mosaic.extractors.doric_extractor import _read_doric_v1_keys
 
         # Create a mock h5file with proper structure
-        # _read_doric_v1_keys checks: "Traces" in h5file, "Console" in h5file["Traces"]
+        # _read_doric_v1_keys checks: "Traces" in h5file, "Console" in
+        # h5file["Traces"]
         mock_console = MagicMock()
         mock_console.keys.return_value = ["Time(s)", "AIn-1", "AIn-2"]
 
@@ -1682,7 +1683,8 @@ class TestDandiExtractorFullCoverage:
     """Full coverage tests for DANDI extractor."""
 
     def test_dandi_extractor_full_init(self):
-        """Test full DandiFiberPhotometryExtractor initialization with mocks."""
+        """Test full DandiFiberPhotometryExtractor initialization with
+        mocks."""
         from fiber_mosaic.extractors import DandiFiberPhotometryExtractor
 
         mock_data = np.random.randn(100, 2)
@@ -1704,8 +1706,14 @@ class TestDandiExtractorFullCoverage:
 
         mock_io = MagicMock()
 
-        with patch("fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"):
-            with patch("fiber_mosaic.extractors.dandi_extractor._stream_nwb", return_value=(mock_nwbfile, mock_io)):
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor."
+            "_check_dandi_dependencies"
+        ):
+            with patch(
+                "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+                return_value=(mock_nwbfile, mock_io),
+            ):
                 rec = DandiFiberPhotometryExtractor(
                     "dandi://000123/sub-1/file.nwb",
                     series_name="GCaMP",
@@ -1737,8 +1745,14 @@ class TestDandiExtractorFullCoverage:
 
         mock_io = MagicMock()
 
-        with patch("fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"):
-            with patch("fiber_mosaic.extractors.dandi_extractor._stream_nwb", return_value=(mock_nwbfile, mock_io)):
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor."
+            "_check_dandi_dependencies"
+        ):
+            with patch(
+                "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+                return_value=(mock_nwbfile, mock_io),
+            ):
                 # No series_name specified - should auto-select
                 rec = DandiFiberPhotometryExtractor(
                     "dandi://000123/sub-1/file.nwb"
@@ -1754,9 +1768,17 @@ class TestDandiExtractorFullCoverage:
 
         mock_io = MagicMock()
 
-        with patch("fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"):
-            with patch("fiber_mosaic.extractors.dandi_extractor._stream_nwb", return_value=(mock_nwbfile, mock_io)):
-                with pytest.raises(ValueError, match="No FiberPhotometryResponseSeries"):
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor."
+            "_check_dandi_dependencies"
+        ):
+            with patch(
+                "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+                return_value=(mock_nwbfile, mock_io),
+            ):
+                with pytest.raises(
+                    ValueError, match="No FiberPhotometryResponseSeries"
+                ):
                     DandiFiberPhotometryExtractor("dandi://000123/sub-1/file.nwb")
 
     def test_dandi_extractor_multiple_series_no_name(self):
@@ -1776,8 +1798,14 @@ class TestDandiExtractorFullCoverage:
 
         mock_io = MagicMock()
 
-        with patch("fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"):
-            with patch("fiber_mosaic.extractors.dandi_extractor._stream_nwb", return_value=(mock_nwbfile, mock_io)):
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor."
+            "_check_dandi_dependencies"
+        ):
+            with patch(
+                "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+                return_value=(mock_nwbfile, mock_io),
+            ):
                 with pytest.raises(ValueError, match="Multiple series found"):
                     DandiFiberPhotometryExtractor("dandi://000123/sub-1/file.nwb")
 
@@ -1794,8 +1822,14 @@ class TestDandiExtractorFullCoverage:
 
         mock_io = MagicMock()
 
-        with patch("fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"):
-            with patch("fiber_mosaic.extractors.dandi_extractor._stream_nwb", return_value=(mock_nwbfile, mock_io)):
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor."
+            "_check_dandi_dependencies"
+        ):
+            with patch(
+                "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+                return_value=(mock_nwbfile, mock_io),
+            ):
                 with pytest.raises(ValueError, match="not found"):
                     DandiFiberPhotometryExtractor(
                         "dandi://000123/sub-1/file.nwb",
@@ -1815,8 +1849,14 @@ class TestDandiExtractorFullCoverage:
 
         mock_io = MagicMock()
 
-        with patch("fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"):
-            with patch("fiber_mosaic.extractors.dandi_extractor._stream_nwb", return_value=(mock_nwbfile, mock_io)):
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor."
+            "_check_dandi_dependencies"
+        ):
+            with patch(
+                "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+                return_value=(mock_nwbfile, mock_io),
+            ):
                 names, ids = DandiFiberPhotometryExtractor.get_streams(
                     "dandi://000123/sub-1/file.nwb"
                 )
@@ -1848,8 +1888,14 @@ class TestDandiExtractorFullCoverage:
 
         mock_io = MagicMock()
 
-        with patch("fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"):
-            with patch("fiber_mosaic.extractors.dandi_extractor._stream_nwb", return_value=(mock_nwbfile, mock_io)):
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor."
+            "_check_dandi_dependencies"
+        ):
+            with patch(
+                "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+                return_value=(mock_nwbfile, mock_io),
+            ):
                 rec = read_dandi_fiber_photometry(
                     "dandi://000123/sub-1/file.nwb",
                     series_name="GCaMP",
@@ -1871,7 +1917,8 @@ class TestDandiExtractorFullCoverage:
         assert sampling_rate == 50.0
 
     def test_dandi_resolve_timing_single_timestamp_no_rate(self):
-        """Test timing resolution with single timestamp and no rate (defaults to 1.0)."""
+        """Test timing resolution with single timestamp and no rate
+        (defaults to 1.0)."""
         from fiber_mosaic.extractors.dandi_extractor import _resolve_timing
 
         class MockSeries:
@@ -1998,8 +2045,13 @@ class TestDoricExtractorFullCoverage:
             mock_h5file.__contains__ = lambda self, x: x == "Traces"
             mock_h5file.__getitem__ = lambda self, x: mock_traces
 
-            with patch("fiber_mosaic.extractors.doric_extractor.h5py.File", return_value=mock_h5file):
-                with patch("fiber_mosaic.extractors.doric_extractor._check_h5py"):
+            with patch(
+                "fiber_mosaic.extractors.doric_extractor.h5py.File",
+                return_value=mock_h5file,
+            ):
+                with patch(
+                    "fiber_mosaic.extractors.doric_extractor._check_h5py"
+                ):
                     mock_h5file.__enter__ = MagicMock(return_value=mock_h5file)
                     mock_h5file.__exit__ = MagicMock(return_value=False)
                     streams = _discover_doric_file_streams(doric_path)
@@ -2016,15 +2068,32 @@ class TestDoricExtractorFullCoverage:
             doric_path = Path(tmpdir) / "test.doric"
 
             mock_h5file = MagicMock()
-            mock_h5file.keys.return_value = ["Configurations", "DataAcquisition"]
+            mock_h5file.keys.return_value = [
+                "Configurations",
+                "DataAcquisition",
+            ]
 
             # V6 has Configurations and DataAcquisition
-            mock_h5file.__contains__ = lambda self, x: x in ["Configurations", "DataAcquisition"]
+            mock_h5file.__contains__ = lambda self, x: x in [
+                "Configurations",
+                "DataAcquisition",
+            ]
 
-            with patch("fiber_mosaic.extractors.doric_extractor.h5py.File", return_value=mock_h5file):
-                with patch("fiber_mosaic.extractors.doric_extractor._check_h5py"):
-                    with patch("fiber_mosaic.extractors.doric_extractor._read_doric_v6_keys", return_value=["Signal1"]):
-                        mock_h5file.__enter__ = MagicMock(return_value=mock_h5file)
+            with patch(
+                "fiber_mosaic.extractors.doric_extractor.h5py.File",
+                return_value=mock_h5file,
+            ):
+                with patch(
+                    "fiber_mosaic.extractors.doric_extractor._check_h5py"
+                ):
+                    with patch(
+                        "fiber_mosaic.extractors.doric_extractor."
+                        "_read_doric_v6_keys",
+                        return_value=["Signal1"],
+                    ):
+                        mock_h5file.__enter__ = MagicMock(
+                            return_value=mock_h5file
+                        )
                         mock_h5file.__exit__ = MagicMock(return_value=False)
                         streams = _discover_doric_file_streams(doric_path)
                         assert "Signal1" in streams
@@ -2042,8 +2111,13 @@ class TestDoricExtractorFullCoverage:
             mock_h5file.keys.return_value = ["UnknownKey"]
             mock_h5file.__contains__ = lambda self, x: False
 
-            with patch("fiber_mosaic.extractors.doric_extractor.h5py.File", return_value=mock_h5file):
-                with patch("fiber_mosaic.extractors.doric_extractor._check_h5py"):
+            with patch(
+                "fiber_mosaic.extractors.doric_extractor.h5py.File",
+                return_value=mock_h5file,
+            ):
+                with patch(
+                    "fiber_mosaic.extractors.doric_extractor._check_h5py"
+                ):
                     mock_h5file.__enter__ = MagicMock(return_value=mock_h5file)
                     mock_h5file.__exit__ = MagicMock(return_value=False)
                     streams = _discover_doric_file_streams(doric_path)
@@ -2057,7 +2131,9 @@ class TestDoricExtractorFullCoverage:
         mock_data = np.array([100.0, 101.0, 102.0])
 
         mock_console = MagicMock()
-        mock_console.__getitem__ = lambda self, k: mock_timestamps if k == "Time(s)" else mock_data
+        mock_console.__getitem__ = (
+            lambda self, k: mock_timestamps if k == "Time(s)" else mock_data
+        )
 
         mock_traces = MagicMock()
         mock_traces.__getitem__ = lambda self, k: mock_console
@@ -2065,7 +2141,9 @@ class TestDoricExtractorFullCoverage:
         mock_h5file = MagicMock()
         mock_h5file.__getitem__ = lambda self, k: mock_traces
 
-        data, timestamps, sampling_rate = _read_doric_v1_data(mock_h5file, "Signal")
+        data, timestamps, sampling_rate = _read_doric_v1_data(
+            mock_h5file, "Signal"
+        )
         np.testing.assert_array_equal(data, mock_data)
         np.testing.assert_array_equal(timestamps, mock_timestamps)
 
@@ -2078,13 +2156,20 @@ class TestDoricExtractorFullCoverage:
 
         mock_data_group = MagicMock()
         mock_data_group.__contains__ = lambda self, k: k in ["Values", "Time"]
-        mock_data_group.__getitem__ = lambda self, k: mock_data if k == "Values" else mock_timestamps
+        mock_data_group.__getitem__ = (
+            lambda self, k: mock_data if k == "Values" else mock_timestamps
+        )
         mock_data_group.keys.return_value = ["Values", "Time"]
 
         mock_h5file = MagicMock()
 
-        with patch("fiber_mosaic.extractors.doric_extractor._find_v6_group", return_value=mock_data_group):
-            data, timestamps, sr = _read_doric_v6_data(mock_h5file, "Signal/AIn-1")
+        with patch(
+            "fiber_mosaic.extractors.doric_extractor._find_v6_group",
+            return_value=mock_data_group,
+        ):
+            data, timestamps, sr = _read_doric_v6_data(
+                mock_h5file, "Signal/AIn-1"
+            )
             np.testing.assert_array_equal(data, mock_data)
 
     def test_doric_read_v6_data_not_found(self):
@@ -2093,7 +2178,10 @@ class TestDoricExtractorFullCoverage:
 
         mock_h5file = MagicMock()
 
-        with patch("fiber_mosaic.extractors.doric_extractor._find_v6_group", return_value=None):
+        with patch(
+            "fiber_mosaic.extractors.doric_extractor._find_v6_group",
+            return_value=None,
+        ):
             with pytest.raises(ValueError, match="Could not find data"):
                 _read_doric_v6_data(mock_h5file, "Nonexistent/Stream")
 
@@ -2177,8 +2265,16 @@ class TestDoricExtractorFullCoverage:
             mock_timestamps = np.array([0.0, 0.1, 0.2])
 
             with patch("fiber_mosaic.extractors.doric_extractor._check_h5py"):
-                with patch("fiber_mosaic.extractors.doric_extractor._discover_doric_file_streams", return_value=["Signal"]):
-                    with patch("fiber_mosaic.extractors.doric_extractor._read_doric_file_data", return_value=(mock_data, mock_timestamps, 10.0)):
+                with patch(
+                    "fiber_mosaic.extractors.doric_extractor."
+                    "_discover_doric_file_streams",
+                    return_value=["Signal"],
+                ):
+                    with patch(
+                        "fiber_mosaic.extractors.doric_extractor."
+                        "_read_doric_file_data",
+                        return_value=(mock_data, mock_timestamps, 10.0),
+                    ):
                         rec = DoricFiberPhotometryExtractor(
                             str(doric_path),
                             stream_name="Signal",
@@ -2201,11 +2297,20 @@ class TestDoricExtractorFullCoverage:
 
             mock_data = (np.array([1.0, 2.0]), np.array([0.0, 0.1]), 10.0)
 
-            with patch("fiber_mosaic.extractors.doric_extractor.h5py.File", return_value=mock_h5file):
-                with patch("fiber_mosaic.extractors.doric_extractor._read_doric_v1_data", return_value=mock_data):
+            with patch(
+                "fiber_mosaic.extractors.doric_extractor.h5py.File",
+                return_value=mock_h5file,
+            ):
+                with patch(
+                    "fiber_mosaic.extractors.doric_extractor."
+                    "_read_doric_v1_data",
+                    return_value=mock_data,
+                ):
                     mock_h5file.__enter__ = MagicMock(return_value=mock_h5file)
                     mock_h5file.__exit__ = MagicMock(return_value=False)
-                    data, timestamps, sr = _read_doric_file_data(doric_path, "Signal")
+                    data, timestamps, sr = _read_doric_file_data(
+                        doric_path, "Signal"
+                    )
                     np.testing.assert_array_equal(data, mock_data[0])
 
     def test_doric_get_streams_doric_file_in_folder(self):
@@ -2216,9 +2321,17 @@ class TestDoricExtractorFullCoverage:
             doric_path = Path(tmpdir) / "test.doric"
             doric_path.touch()
 
-            with patch("fiber_mosaic.extractors.doric_extractor._discover_doric_file_streams", return_value=["Signal"]):
-                with patch("fiber_mosaic.extractors.doric_extractor._check_h5py"):
-                    names, ids = DoricFiberPhotometryExtractor.get_streams(tmpdir)
+            with patch(
+                "fiber_mosaic.extractors.doric_extractor."
+                "_discover_doric_file_streams",
+                return_value=["Signal"],
+            ):
+                with patch(
+                    "fiber_mosaic.extractors.doric_extractor._check_h5py"
+                ):
+                    names, ids = (
+                        DoricFiberPhotometryExtractor.get_streams(tmpdir)
+                    )
                     assert "Signal" in names
 
 
@@ -2285,7 +2398,9 @@ class TestNwbExtractorFullCoverage:
             mock_series.data.__getitem__ = lambda self, x: mock_data
             mock_series.data.shape = mock_data.shape
             mock_series.timestamps = MagicMock()
-            mock_series.timestamps.__getitem__ = lambda self, x: mock_timestamps
+            mock_series.timestamps.__getitem__ = (
+                lambda self, x: mock_timestamps
+            )
             mock_series.timestamps.__len__ = lambda self: len(mock_timestamps)
             mock_series.timestamps.__bool__ = lambda self: True
 
@@ -2298,7 +2413,10 @@ class TestNwbExtractorFullCoverage:
             mock_io.__exit__ = MagicMock(return_value=False)
 
             with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
-                with patch("fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO", return_value=mock_io):
+                with patch(
+                    "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+                    return_value=mock_io,
+                ):
                     rec = NwbFiberPhotometryExtractor(
                         str(nwb_path),
                         series_name="FPSeries",
@@ -2324,8 +2442,14 @@ class TestNwbExtractorFullCoverage:
             mock_io.__exit__ = MagicMock(return_value=False)
 
             with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
-                with patch("fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO", return_value=mock_io):
-                    with pytest.raises(ValueError, match="No FiberPhotometryResponseSeries"):
+                with patch(
+                    "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+                    return_value=mock_io,
+                ):
+                    with pytest.raises(
+                        ValueError,
+                        match="No FiberPhotometryResponseSeries",
+                    ):
                         NwbFiberPhotometryExtractor(str(nwb_path))
 
     def test_nwb_extractor_multiple_series_no_name(self):
@@ -2345,7 +2469,10 @@ class TestNwbExtractorFullCoverage:
             mock_series2.neurodata_type = "FiberPhotometryResponseSeries"
 
             mock_nwbfile = MagicMock()
-            mock_nwbfile.objects.values.return_value = [mock_series1, mock_series2]
+            mock_nwbfile.objects.values.return_value = [
+                mock_series1,
+                mock_series2,
+            ]
 
             mock_io = MagicMock()
             mock_io.read.return_value = mock_nwbfile
@@ -2353,8 +2480,13 @@ class TestNwbExtractorFullCoverage:
             mock_io.__exit__ = MagicMock(return_value=False)
 
             with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
-                with patch("fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO", return_value=mock_io):
-                    with pytest.raises(ValueError, match="Multiple series found"):
+                with patch(
+                    "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+                    return_value=mock_io,
+                ):
+                    with pytest.raises(
+                        ValueError, match="Multiple series found"
+                    ):
                         NwbFiberPhotometryExtractor(str(nwb_path))
 
     def test_nwb_extractor_series_not_found(self):
@@ -2378,7 +2510,10 @@ class TestNwbExtractorFullCoverage:
             mock_io.__exit__ = MagicMock(return_value=False)
 
             with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
-                with patch("fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO", return_value=mock_io):
+                with patch(
+                    "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+                    return_value=mock_io,
+                ):
                     with pytest.raises(ValueError, match="not found"):
                         NwbFiberPhotometryExtractor(
                             str(nwb_path),
@@ -2406,8 +2541,13 @@ class TestNwbExtractorFullCoverage:
             mock_io.__exit__ = MagicMock(return_value=False)
 
             with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
-                with patch("fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO", return_value=mock_io):
-                    names, ids = NwbFiberPhotometryExtractor.get_streams(str(nwb_path))
+                with patch(
+                    "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+                    return_value=mock_io,
+                ):
+                    names, ids = NwbFiberPhotometryExtractor.get_streams(
+                        str(nwb_path)
+                    )
                     assert "TestSeries" in names
 
     def test_read_nwb_convenience_function(self):
@@ -2430,7 +2570,9 @@ class TestNwbExtractorFullCoverage:
             mock_series.data.__getitem__ = lambda self, x: mock_data
             mock_series.data.shape = mock_data.shape
             mock_series.timestamps = MagicMock()
-            mock_series.timestamps.__getitem__ = lambda self, x: mock_timestamps
+            mock_series.timestamps.__getitem__ = (
+                lambda self, x: mock_timestamps
+            )
             mock_series.timestamps.__len__ = lambda self: len(mock_timestamps)
             mock_series.timestamps.__bool__ = lambda self: True
 
@@ -2443,7 +2585,10 @@ class TestNwbExtractorFullCoverage:
             mock_io.__exit__ = MagicMock(return_value=False)
 
             with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
-                with patch("fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO", return_value=mock_io):
+                with patch(
+                    "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+                    return_value=mock_io,
+                ):
                     rec = read_nwb_fiber_photometry(str(nwb_path))
                     assert rec.get_num_fibers() == 1
 
@@ -2674,7 +2819,9 @@ class TestTdtExtractorFullCoverage:
             record.tofile(str(tsq_path))
 
             with pytest.raises(ValueError, match="not found"):
-                TdtFiberPhotometryExtractor(tmpdir, store_name="NonexistentStore")
+                TdtFiberPhotometryExtractor(
+                    tmpdir, store_name="NonexistentStore"
+                )
 
     def test_tdt_extractor_event_store(self):
         """Test error when store is event/strobe data."""
