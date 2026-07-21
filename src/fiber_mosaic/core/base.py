@@ -45,6 +45,9 @@ class BaseFiberPhotometryExtractor(BaseRecording):
             dtype=dtype,
         )
         self.color = color
+        # also expose color as an annotation so it survives SpikeInterface
+        # preprocessing steps (copy_metadata propagates annotations).
+        self.annotate(color=color)
         self._kwargs["color"] = color
         self._kwargs["fiber_ids"] = channel_ids
 
@@ -249,7 +252,7 @@ class FiberPhotometryRecordingGroup:
         self._recordings: dict[str, BaseRecording] = dict(recordings)
 
         fiber_sets = {
-            color: tuple(rec.get_fiber_ids())
+            color: tuple(rec.get_channel_ids())
             for color, rec in self._recordings.items()
         }
         unique = set(fiber_sets.values())
@@ -258,6 +261,27 @@ class FiberPhotometryRecordingGroup:
                 f"Fiber IDs differ across colors: {fiber_sets}. "
                 "All per-color recordings must share the same fibers."
             )
+
+    def with_recording(
+        self, name: str, recording: BaseRecording
+    ) -> FiberPhotometryRecordingGroup:
+        """Return a new group with ``recording`` set under ``name``.
+
+        Parameters
+        ----------
+        name : str
+            Color/band label to store the recording under.
+        recording : BaseRecording
+            Recording to add; must share the group's fiber IDs.
+
+        Returns
+        -------
+        FiberPhotometryRecordingGroup
+            A new group including ``recording`` (the original is unchanged).
+        """
+        updated = dict(self._recordings)
+        updated[name] = recording
+        return FiberPhotometryRecordingGroup(updated)
 
     @property
     def colors(self) -> list[str]:
