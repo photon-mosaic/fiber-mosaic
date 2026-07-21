@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
 
 [project]
 name = "fiber-mosaic"
@@ -30,11 +30,11 @@ dev = [
     'Sphinx'
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.pdm.build]
+package-dir = "src"
 
-[tool.setuptools.dynamic]
-version = {attr = "fiber_mosaic.__version__"}
+[tool.pdm.version]
+source = "scm"
 
 [tool.ruff]
 line-length = 79
