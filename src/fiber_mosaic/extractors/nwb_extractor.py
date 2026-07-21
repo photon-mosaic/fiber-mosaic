@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 # Check for pynwb availability
 try:
     from pynwb import NWBHDF5IO
+
     HAVE_PYNWB = True
 except ImportError:
     HAVE_PYNWB = False

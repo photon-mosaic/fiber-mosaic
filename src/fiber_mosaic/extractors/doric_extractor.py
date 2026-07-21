@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 # Check for h5py availability
 try:
     import h5py
+
     HAVE_H5PY = True
 except ImportError:
     HAVE_H5PY = False
@@ -132,8 +133,7 @@ def _discover_doric_csv_streams(file_path: Path) -> list[str]:
 
 
 def _read_doric_v1_data(
-    h5file,
-    stream_name: str
+    h5file, stream_name: str
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """Read data from Doric V1 format."""
     console = h5file["Traces"]["Console"]
@@ -188,8 +188,7 @@ def _extract_v6_timestamps(data_group, data_len: int) -> np.ndarray:
 
 
 def _read_doric_v6_data(
-    h5file,
-    stream_name: str
+    h5file, stream_name: str
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """Read data from Doric V6 format."""
     parts = stream_name.split("/")
@@ -210,8 +209,7 @@ def _read_doric_v6_data(
 
 
 def _read_doric_csv_data(
-    file_path: Path,
-    stream_name: str
+    file_path: Path, stream_name: str
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """Read data from Doric CSV file."""
     df = pd.read_csv(file_path, header=1, index_col=False)
@@ -265,8 +263,7 @@ def _select_doric_stream(
 
     if stream_name not in available_streams:
         raise ValueError(
-            f"Stream '{stream_name}' not found. "
-            f"Available: {available_streams}"
+            f"Stream '{stream_name}' not found. Available: {available_streams}"
         )
     return stream_name
 

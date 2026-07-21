@@ -75,7 +75,7 @@ def parse_dandi_uri(uri: str) -> tuple[str, str]:
     if not is_dandi_uri(uri):
         raise ValueError(f"Not a valid DANDI URI: {uri}")
 
-    stripped = uri[len(DANDI_URI_PREFIX):]
+    stripped = uri[len(DANDI_URI_PREFIX) :]
     parts = stripped.split("/", 1)
 
     if len(parts) < 2:

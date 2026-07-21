@@ -200,7 +200,8 @@ def detect_formats(folder_path: str) -> set[str]:
     if has_npm_data:
         # Suppress NPM-generated split-event files (event*.csv)
         external_event_csv_paths = [
-            p for p in event_csv_paths
+            p
+            for p in event_csv_paths
             if not os.path.basename(p).startswith("event")
         ]
     else:

@@ -68,7 +68,12 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         # Find time column
         time_col = None
         time_candidates = [
-            time_column, "time", "timestamps", "Time", "Timestamps", "Time(s)"
+            time_column,
+            "time",
+            "timestamps",
+            "Time",
+            "Timestamps",
+            "Time(s)",
         ]
         for candidate in time_candidates:
             if candidate in columns:

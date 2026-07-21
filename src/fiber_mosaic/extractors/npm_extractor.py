@@ -67,8 +67,7 @@ def _discover_npm_streams(file_path: Path) -> tuple[list[str], dict[str, int]]:
     # Find data columns (not timestamp, not LED state)
     timestamp_cols = {"timestamp", "timestamps", "time", "framecounter"}
     data_columns = [
-        c for c in columns
-        if c.lower() not in timestamp_cols and c != led_col
+        c for c in columns if c.lower() not in timestamp_cols and c != led_col
     ]
 
     # Find unique LED states

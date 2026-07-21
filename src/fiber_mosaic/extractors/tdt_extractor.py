@@ -37,17 +37,32 @@ def _read_tsq(folder_path: str | Path) -> tuple[pd.DataFrame | None, bool]:
         True if TSQ file was found and read successfully.
     """
     names = (
-        "size", "type", "name", "chan", "sort_code",
-        "timestamp", "fp_loc", "strobe", "format", "frequency"
+        "size",
+        "type",
+        "name",
+        "chan",
+        "sort_code",
+        "timestamp",
+        "fp_loc",
+        "strobe",
+        "format",
+        "frequency",
     )
     formats = (
-        int32, int32, "S4", uint16, uint16,
-        float64, int64, float64, int32, float32
+        int32,
+        int32,
+        "S4",
+        uint16,
+        uint16,
+        float64,
+        int64,
+        float64,
+        int32,
+        float32,
     )
     offsets = (0, 4, 8, 12, 14, 16, 24, 24, 32, 36)
     tsq_dtype = np.dtype(
-        {"names": names, "formats": formats, "offsets": offsets},
-        align=True
+        {"names": names, "formats": formats, "offsets": offsets}, align=True
     )
 
     folder_path = Path(folder_path)
@@ -78,9 +93,7 @@ def _get_store_names(header_df: pd.DataFrame) -> list[str]:
 
 
 def _read_tev_store(
-    folder_path: Path,
-    header_df: pd.DataFrame,
-    store_name: str
+    folder_path: Path, header_df: pd.DataFrame, store_name: str
 ) -> dict[str, np.ndarray]:
     """
     Read data for a specific store from TDT TEV file.
@@ -140,9 +153,7 @@ def _read_tev_store(
             for i, loc in enumerate(fp_loc):
                 fp.seek(int(loc), os.SEEK_SET)
                 store_data[i, :] = np.fromfile(
-                    fp,
-                    dtype=format_table[format_code][3],
-                    count=nsample
+                    fp, dtype=format_table[format_code][3], count=nsample
                 ).reshape(1, nsample, order="F")
 
         result["data"] = store_data.T.reshape(-1, order="F")

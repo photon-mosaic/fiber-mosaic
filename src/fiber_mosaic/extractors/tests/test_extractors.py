@@ -103,11 +103,13 @@ class TestBaseFiberPhotometryExtractor:
         np.testing.assert_allclose(retrieved[:, 0], times_1d)
 
         # Test 2D times (per-fiber)
-        times_2d = np.column_stack([
-            times_1d,
-            times_1d + 0.001,  # Slightly offset
-            times_1d + 0.002,
-        ])
+        times_2d = np.column_stack(
+            [
+                times_1d,
+                times_1d + 0.001,  # Slightly offset
+                times_1d + 0.002,
+            ]
+        )
         rec.set_times(times_2d)
 
         retrieved = rec.get_fiber_times()
@@ -139,18 +141,18 @@ class TestFiberPhotometryRecordingGroup:
             fiber_ids=fiber_ids,
             color="green",
         )
-        green.add_segment(NumpyRecordingSegment(
-            np.random.randn(n_samples, 2), sampling_rate
-        ))
+        green.add_segment(
+            NumpyRecordingSegment(np.random.randn(n_samples, 2), sampling_rate)
+        )
 
         iso = TestExtractor(
             sampling_frequency=sampling_rate,
             fiber_ids=fiber_ids,
             color="iso",
         )
-        iso.add_segment(NumpyRecordingSegment(
-            np.random.randn(n_samples, 2), sampling_rate
-        ))
+        iso.add_segment(
+            NumpyRecordingSegment(np.random.randn(n_samples, 2), sampling_rate)
+        )
 
         # Create group
         group = FiberPhotometryRecordingGroup({"green": green, "iso": iso})
