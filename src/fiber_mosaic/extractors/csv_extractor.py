@@ -24,7 +24,7 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
     Reads CSV files containing timestamps and fluorescence data. The CSV
     should have:
-    - A time column (default: "time" or "timestamps")
+    - A time column (default name "time"; pass time_column for others)
     - One or more data columns (fiber channels)
 
     Parameters
@@ -34,8 +34,9 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     color : str
         Color/wavelength identifier for this recording (e.g., "green", "iso").
     time_column : str, optional
-        Name of the timestamp column. Default is "time".
-        Will also try "timestamps" if "time" is not found.
+        Name of the timestamp column. Default is "time". Matched exactly; if
+        your file names it anything else, pass that name here. The column is
+        required (timestamps synchronize signals with behavior events).
     fiber_columns : list of str, optional
         Names of the fiber data columns to read. If None, reads all columns
         except the time column.
@@ -65,26 +66,16 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         df = pd.read_csv(file_path, index_col=False)
         columns = list(df.columns)
 
-        # Find time column
-        time_col = None
-        time_candidates = [
-            time_column,
-            "time",
-            "timestamps",
-            "Time",
-            "Timestamps",
-            "Time(s)",
-        ]
-        for candidate in time_candidates:
-            if candidate in columns:
-                time_col = candidate
-                break
-        if time_col is None:
+        # The time column is required (recordings are synchronized against
+        # behavior events) and matched exactly: the default is "time"; name
+        # any other column explicitly via time_column. No fuzzy fallback.
+        if time_column not in columns:
             raise ValueError(
-                f"Could not find time column. "
-                f"Tried: {time_column}, time, timestamps. "
-                f"Available columns: {columns}"
+                f"Time column {time_column!r} not found. Timestamps are "
+                f"required to synchronize signals with behavior events; pass "
+                f"time_column= to name it. Available columns: {columns}"
             )
+        time_col = time_column
 
         # Determine fiber columns
         if fiber_columns is None:
@@ -151,7 +142,9 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
 
     @classmethod
-    def get_streams(cls, file_path: str) -> tuple[list[str], list[str]]:
+    def get_streams(
+        cls, file_path: str, time_column: str = "time", **kwargs
+    ) -> tuple[list[str], list[str]]:
         """
         Discover available streams (columns) in a CSV file.
 
@@ -159,11 +152,15 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         ----------
         file_path : str
             Path to the CSV file.
+        time_column : str, optional
+            Name of the timestamp column to exclude from the reported
+            streams. Default is "time"; pass the same value you would give
+            the constructor so discovery matches what will be loaded.
 
         Returns
         -------
         stream_names : list of str
-            Names of data columns (excluding time column).
+            Names of data columns (excluding the time column).
         stream_ids : list of str
             Same as stream_names for CSV files.
         """
@@ -171,9 +168,8 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         df = pd.read_csv(file_path, nrows=0, index_col=False)
         columns = list(df.columns)
 
-        # Identify time column
-        time_columns = {"time", "timestamps", "Time", "Timestamps", "Time(s)"}
-        data_columns = [c for c in columns if c not in time_columns]
+        # Exclude exactly the named time column, matching the loader.
+        data_columns = [c for c in columns if c != time_column]
 
         return data_columns, data_columns
 
