@@ -96,6 +96,77 @@ class TestCsvExtractor:
         finally:
             Path(csv_path).unlink()
 
+    def test_csv_fiber_pattern_selects_only_data_columns(self):
+        """AIND FIP layout: fiber_pattern selects Fiber_* and drops metadata."""
+        from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as f:
+            # FIP-style columns: a time column, metadata, and fiber channels.
+            f.write(
+                "ReferenceTime,CameraFrameNumber,Background,Fiber_0,Fiber_1\n"
+            )
+            f.write("0.00,0,10.0,1.0,2.0\n")
+            f.write("0.01,1,10.1,1.1,2.1\n")
+            csv_path = f.name
+
+        try:
+            rec = CsvFiberPhotometryExtractor(
+                csv_path,
+                color="green",
+                time_column="ReferenceTime",
+                fiber_pattern="Fiber_*",
+            )
+            # Only the two fiber channels are loaded; metadata is ignored.
+            assert list(rec.fiber_ids) == ["Fiber_0", "Fiber_1"]
+            assert rec.get_num_fibers() == 2
+            assert "Background" not in rec.fiber_ids
+            assert "CameraFrameNumber" not in rec.fiber_ids
+        finally:
+            Path(csv_path).unlink()
+
+    def test_csv_fiber_pattern_no_match_raises(self):
+        """A pattern that matches nothing is a loud error, not empty data."""
+        from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as f:
+            f.write("time,signal\n0.0,1.0\n0.1,2.0\n")
+            csv_path = f.name
+
+        try:
+            with pytest.raises(
+                ValueError, match="matched no columns"
+            ):
+                CsvFiberPhotometryExtractor(
+                    csv_path, color="green", fiber_pattern="Fiber_*"
+                )
+        finally:
+            Path(csv_path).unlink()
+
+    def test_csv_get_streams_fiber_pattern(self):
+        """Discovery can positively filter streams by fiber_pattern."""
+        from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as f:
+            f.write(
+                "ReferenceTime,CameraFrameNumber,Background,Fiber_0,Fiber_1\n"
+            )
+            f.write("0.00,0,10.0,1.0,2.0\n")
+            csv_path = f.name
+
+        try:
+            names, _ = CsvFiberPhotometryExtractor.get_streams(
+                csv_path, time_column="ReferenceTime", fiber_pattern="Fiber_*"
+            )
+            assert names == ["Fiber_0", "Fiber_1"]
+        finally:
+            Path(csv_path).unlink()
+
     def test_csv_extractor_file_not_found(self):
         """Test that FileNotFoundError is raised for missing file."""
         from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
