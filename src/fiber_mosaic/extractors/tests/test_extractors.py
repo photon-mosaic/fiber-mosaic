@@ -97,7 +97,8 @@ class TestCsvExtractor:
             Path(csv_path).unlink()
 
     def test_csv_fiber_pattern_selects_only_data_columns(self):
-        """AIND FIP layout: fiber_pattern selects Fiber_* and drops metadata."""
+        """AIND FIP layout: fiber_pattern selects Fiber_* and drops
+        metadata."""
         from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
 
         with tempfile.NamedTemporaryFile(
@@ -137,9 +138,7 @@ class TestCsvExtractor:
             csv_path = f.name
 
         try:
-            with pytest.raises(
-                ValueError, match="matched no columns"
-            ):
+            with pytest.raises(ValueError, match="matched no columns"):
                 CsvFiberPhotometryExtractor(
                     csv_path, color="green", fiber_pattern="Fiber_*"
                 )
