@@ -261,7 +261,9 @@ class BaseFiberPhotometryExtractor(BaseRecording):
             ).copy()
 
     @classmethod
-    def get_streams(cls, file_path: str) -> tuple[list[str], list[str]]:
+    def get_streams(
+        cls, file_path: str, **kwargs
+    ) -> tuple[list[str], list[str]]:
         """
         Discover available streams in a file.
 
@@ -273,6 +275,12 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         ----------
         file_path : str
             Path to the file or folder to inspect.
+        **kwargs
+            Format-specific discovery options. Most readers ignore these;
+            some accept keywords that mirror their constructor (e.g. the CSV
+            reader accepts ``time_column`` so discovery excludes the same
+            column the loader will). Overrides should declare the options
+            they support explicitly.
 
         Returns
         -------
