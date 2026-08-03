@@ -356,7 +356,8 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         if color is None:
             raise ValueError(
                 "color must be provided explicitly (e.g. color='470nm'). "
-                "Doric stream names encode demodulation type, not illumination color."
+                "Doric stream names encode demodulation type, "
+                "not illumination color."
             )
 
         # Initialize base class
