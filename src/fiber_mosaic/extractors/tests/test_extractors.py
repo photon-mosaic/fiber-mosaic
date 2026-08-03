@@ -859,8 +859,21 @@ class TestDoricExtractor:
                 "Console,Signal\nTime(s),Signal\n0.0,100.0\n0.1,101.0\n"
             )
 
-            rec = DoricFiberPhotometryExtractor(csv_path)
+            rec = DoricFiberPhotometryExtractor(csv_path, color="green")
             assert rec.get_num_samples() == 2
+
+    def test_doric_no_color_raises(self):
+        """Test that omitting color raises a ValueError."""
+        from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "doric_data.csv"
+            csv_path.write_text(
+                "Console,Signal\nTime(s),Signal\n0.0,100.0\n0.1,101.0\n"
+            )
+
+            with pytest.raises(ValueError, match="color must be provided"):
+                DoricFiberPhotometryExtractor(csv_path)
 
     def test_doric_csv_no_streams(self):
         """Test error when no streams found."""
@@ -949,7 +962,7 @@ class TestDoricExtractor:
             # Single stream so auto-selection works
             csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
 
-            rec = DoricFiberPhotometryExtractor(tmpdir)
+            rec = DoricFiberPhotometryExtractor(tmpdir, color="green")
             assert rec.get_num_samples() == 1
 
     def test_doric_folder_no_files(self):
@@ -971,7 +984,7 @@ class TestDoricExtractor:
             # Single stream so auto-selection works
             csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
 
-            rec = read_doric_fiber_photometry(csv_path)
+            rec = read_doric_fiber_photometry(csv_path, color="green")
             assert rec.get_num_samples() == 1
 
     @patch("fiber_mosaic.extractors.doric_extractor.HAVE_H5PY", False)
@@ -1489,7 +1502,7 @@ class TestAdditionalCoverage:
             # Single stream (Signal) for auto-selection
             csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
 
-            rec = DoricFiberPhotometryExtractor(csv_path)
+            rec = DoricFiberPhotometryExtractor(csv_path, color="green")
             assert rec.get_num_samples() == 1
 
     def test_doric_find_files_in_folder(self):
@@ -3159,7 +3172,7 @@ class TestDoricRealFiles:
 
             # Pass the folder so _resolve_doric_path locates the .doric file.
             rec = DoricFiberPhotometryExtractor(
-                tmpdir, stream_name="AnalogIn/AIn-1"
+                tmpdir, stream_name="AnalogIn/AIn-1", color="green"
             )
             assert rec.get_num_samples() == 10
 
