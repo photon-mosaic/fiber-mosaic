@@ -294,8 +294,10 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     stream_name : str, optional
         Name of the stream to read. If None and only one stream exists,
         it will be used automatically.
-    color : str, optional
-        Color/wavelength identifier. If None, uses the stream name.
+    color : str
+        Color/wavelength identifier (e.g. ``'470nm'``, ``'415nm'``).
+        Must be provided explicitly; Doric stream names do not encode
+        illumination color.
 
     Examples
     --------
@@ -351,9 +353,11 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         # Create fiber IDs
         fiber_ids = [stream_name]
 
-        # Use stream name as color if not provided
         if color is None:
-            color = stream_name
+            raise ValueError(
+                "color must be provided explicitly (e.g. color='470nm'). "
+                "Doric stream names encode demodulation type, not illumination color."
+            )
 
         # Initialize base class
         super().__init__(
