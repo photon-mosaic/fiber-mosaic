@@ -83,7 +83,10 @@ def _discover_fiber_photometry_series(nwbfile) -> dict[str, Any]:
     """
     series_dict = {}
     for obj in nwbfile.objects.values():
-        if obj.neurodata_type == "FiberPhotometryResponseSeries":
+        if (
+            getattr(obj, "neurodata_type", None)
+            == "FiberPhotometryResponseSeries"
+        ):
             series_dict[obj.name] = obj
     return series_dict
 
