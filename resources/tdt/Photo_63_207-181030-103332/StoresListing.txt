@@ -1,0 +1,38 @@
+Experiment: FP_LEFT
+Subject: Photo_63_207
+User: User
+Date: 10/30/2018
+Time: 10:33:54am
+
+ObjectID: RZn(1) - RZn Processor
+ StoreID: RNPS
+ StoreID: LNRW
+ StoreID: LNnR
+ StoreID: PrtR
+ StoreID: PrtN
+ StoreID: Sock
+
+ObjectID: FibPho1 - Fiber Photometry
+ StoreID: Dv1A
+ StoreID: Dv2A
+ StoreID: Dv3B
+ StoreID: Dv4B
+ StoreID: Fi1r
+ StoreID: Fi1i
+
+
+Flat Listing:
+StoreID  Gizmo/Hal
+Dv1A     FibPho1
+Dv2A     FibPho1
+Dv3B     FibPho1
+Dv4B     FibPho1
+Fi1i     FibPho1
+Fi1r     FibPho1
+LNnR     RZn(1)
+LNRW     RZn(1)
+PrtN     RZn(1)
+PrtR     RZn(1)
+RNPS     RZn(1)
+Sock     RZn(1)
+

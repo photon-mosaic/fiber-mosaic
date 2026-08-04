@@ -3142,6 +3142,45 @@ class TestDoricRealFiles:
             assert doric_files == []
             assert csv_files == []
 
+    def test_doric_v1_dataset_ambiguous_group(self):
+        """_get_v1_dataset raises when a wrapping group has multiple
+        children and none matches the requested name."""
+        import h5py
+
+        from fiber_mosaic.extractors.doric_extractor import (
+            _get_v1_dataset,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            doric_path = Path(tmpdir) / "test.doric"
+            with h5py.File(str(doric_path), "w") as f:
+                group = f.create_group("Ambiguous")
+                group.create_dataset("A", data=np.array([1.0]))
+                group.create_dataset("B", data=np.array([2.0]))
+
+            with h5py.File(str(doric_path), "r") as f:
+                with pytest.raises(ValueError, match="multiple candidates"):
+                    _get_v1_dataset(f, "Ambiguous")
+
+    def test_find_v6_parent_dataset_leaf_not_found(self):
+        """_find_v6_parent_dataset returns None when the final path part
+        does not resolve to a dataset in the matched group."""
+        import h5py
+
+        from fiber_mosaic.extractors.doric_extractor import (
+            _find_v6_parent_dataset,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            doric_path = Path(tmpdir) / "test.doric"
+            with h5py.File(str(doric_path), "w") as f:
+                group = f.create_group("Group")
+                group.create_dataset("Other", data=np.array([1.0]))
+
+            with h5py.File(str(doric_path), "r") as f:
+                result = _find_v6_parent_dataset(f["Group"], ["Missing"])
+                assert result is None
+
     def test_doric_read_v1_data_single_sample(self):
         """Single-sample V1 data falls back to sampling_rate=1.0."""
         import h5py
@@ -3335,6 +3374,113 @@ class TestTdtBranchCoverage:
 
             rec = TdtFiberPhotometryExtractor(tmpdir)
             assert rec.get_num_samples() == 40
+
+
+RESOURCES_DIR = Path(__file__).resolve().parents[4] / "resources"
+
+
+@pytest.mark.skipif(
+    not RESOURCES_DIR.exists(), reason="resources/ directory not available"
+)
+class TestDoricGuPPySampleSessions:
+    """Doric extractor tests against real sessions ported from GuPPy's
+    stubbed_testing_data. These are truncated real recordings, not
+    synthetic mocks, so they exercise the actual on-disk HDF5 layouts
+    produced by Doric hardware (as opposed to the flatter layouts the
+    rest of this test module assumes).
+    """
+
+    def test_sample_doric_1_v1_console_group(self):
+        """V1 format where 'Time(s)' and each stream are groups wrapping
+        a nested dataset, rather than datasets directly (regression
+        test: previously raised TypeError from indexing a Group with a
+        slice)."""
+        from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
+
+        session_dir = RESOURCES_DIR / "doric" / "sample_doric_1"
+        rec = DoricFiberPhotometryExtractor(
+            session_dir, stream_name="AIn-1 - Raw", color="green"
+        )
+        assert rec.get_num_samples() > 0
+        assert rec.color == "green"
+
+    def test_sample_doric_1_get_streams(self):
+        """Stream discovery lists the V1 console channels."""
+        from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
+
+        session_dir = RESOURCES_DIR / "doric" / "sample_doric_1"
+        names, _ = DoricFiberPhotometryExtractor.get_streams(str(session_dir))
+        assert "AIn-1 - Raw" in names
+        assert "AIn-2 - Raw" in names
+        assert "DI--O-1" in names
+
+    def test_sample_doric_3_v6_nested_roi_datasets(self):
+        """V6 format where sibling ROI datasets (ROI01/ROI02/ROI03) live
+        directly inside a shared group alongside 'Time', rather than
+        each having its own 'Values'-bearing group (regression test:
+        previously raised ValueError since _find_v6_group only matches
+        nested Groups, not sibling Datasets)."""
+        from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
+
+        session_dir = RESOURCES_DIR / "doric" / "sample_doric_3"
+        rec1 = DoricFiberPhotometryExtractor(
+            session_dir, stream_name="CAM1_EXC1/ROI01", color="470nm"
+        )
+        rec2 = DoricFiberPhotometryExtractor(
+            session_dir, stream_name="CAM1_EXC1/ROI02", color="415nm"
+        )
+        assert rec1.get_num_samples() > 0
+        assert rec1.get_num_samples() == rec2.get_num_samples()
+        # Distinct ROIs must not silently resolve to the same trace.
+        assert not np.array_equal(rec1.get_traces(), rec2.get_traces())
+
+    def test_sample_doric_3_v6_nested_ttl_dataset(self):
+        """V6 sibling-dataset resolution also covers the DigitalIO/CAM1
+        TTL channel (not just ROI signal channels)."""
+        from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
+
+        session_dir = RESOURCES_DIR / "doric" / "sample_doric_3"
+        rec = DoricFiberPhotometryExtractor(
+            session_dir, stream_name="DigitalIO/CAM1", color="ttl"
+        )
+        assert rec.get_num_samples() > 0
+
+    def test_sample_doric_4_v6_lockin_group_with_values(self):
+        """V6 format where the leaf group has its own 'Values'/'Time'
+        pair (the pre-existing, already-working V6 shape) still works
+        after the sibling-dataset fallback was added."""
+        from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
+
+        session_dir = RESOURCES_DIR / "doric" / "sample_doric_4"
+        rec = DoricFiberPhotometryExtractor(
+            session_dir,
+            stream_name="Series0001/AIN01xAOUT01-LockIn",
+            color="green",
+        )
+        assert rec.get_num_samples() > 0
+
+    def test_sample_doric_5_v6_lockin_group_with_values(self):
+        """Second independent V6 lock-in example (no TTL events)."""
+        from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
+
+        session_dir = RESOURCES_DIR / "doric" / "sample_doric_5"
+        rec = DoricFiberPhotometryExtractor(
+            session_dir,
+            stream_name="Series0001/AIN01xAOUT01-LockIn",
+            color="green",
+        )
+        assert rec.get_num_samples() > 0
+
+    def test_sample_doric_2_csv_export(self):
+        """Doric CSV export format (distinct from GuPPy's generic CSV
+        layout) still resolves via the CSV code path."""
+        from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
+
+        session_dir = RESOURCES_DIR / "doric" / "sample_doric_2"
+        rec = DoricFiberPhotometryExtractor(
+            session_dir, stream_name="AIn-1 - Dem (da)", color="470nm"
+        )
+        assert rec.get_num_samples() > 0
 
 
 if __name__ == "__main__":
