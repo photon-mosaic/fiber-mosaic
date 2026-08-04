@@ -3368,7 +3368,10 @@ class TestDoricGuPPySampleSessions:
         from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
 
         doric_file = (
-            RESOURCES_DIR / "doric" / "sample_doric_1" / "D2-EPConsole_0039.doric"
+            RESOURCES_DIR
+            / "doric"
+            / "sample_doric_1"
+            / "D2-EPConsole_0039.doric"
         )
         names, _ = DoricFiberPhotometryExtractor.get_streams(doric_file)
         assert "AIn-1 - Raw" in names
