@@ -1096,23 +1096,114 @@ class TestNpmExtractor:
             assert ids == []
 
     def test_npm_timestamp_ms_conversion(self):
-        """Test NPM timestamps in milliseconds are converted."""
+        """Test NPM timestamps in milliseconds are converted to seconds.
+
+        Uses a short recording (max < 1_000_000 ms) to verify the heuristic
+        works on interval rather than magnitude.
+        """
         from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
 
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "npm_data.csv"
+            # 40 Hz in milliseconds: inter-sample interval = 25 ms
             csv_path.write_text(
                 "Timestamp,LedState,Region0G\n"
-                "1000000,1,100.0\n"
-                "2000000,1,101.0\n"
+                "0,1,100.0\n"
+                "25,1,101.0\n"
+                "50,1,102.0\n"
+                "75,1,103.0\n"
             )
 
             rec = NpmFiberPhotometryExtractor(
                 csv_path, stream_name="Region0G_led1"
             )
             times = rec.get_fiber_times()
-            # Should be in seconds now
-            assert times[0, 0] < 10000
+            # Converted to seconds: 0, 0.025, 0.05, 0.075
+            np.testing.assert_allclose(times[:, 0], [0.0, 0.025, 0.05, 0.075])
+
+    def test_npm_timestamp_seconds_not_converted(self):
+        """Test NPM timestamps already in seconds are not converted."""
+        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "npm_data.csv"
+            # 40 Hz in seconds: inter-sample interval = 0.025 s
+            csv_path.write_text(
+                "Timestamp,LedState,Region0G\n"
+                "0.000,1,100.0\n"
+                "0.025,1,101.0\n"
+                "0.050,1,102.0\n"
+                "0.075,1,103.0\n"
+            )
+
+            rec = NpmFiberPhotometryExtractor(
+                csv_path, stream_name="Region0G_led1"
+            )
+            times = rec.get_fiber_times()
+            np.testing.assert_allclose(times[:, 0], [0.0, 0.025, 0.05, 0.075])
+
+    def test_npm_timestamp_unit_ms_explicit(self):
+        """timestamp_unit='ms' forces conversion regardless of interval."""
+        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "npm_data.csv"
+            # Inter-sample interval is 0.025 — heuristic would leave as-is,
+            # but explicit "ms" must still convert.
+            csv_path.write_text(
+                "Timestamp,LedState,Region0G\n"
+                "0.000,1,100.0\n"
+                "0.025,1,101.0\n"
+                "0.050,1,102.0\n"
+                "0.075,1,103.0\n"
+            )
+
+            rec = NpmFiberPhotometryExtractor(
+                csv_path, stream_name="Region0G_led1", timestamp_unit="ms"
+            )
+            times = rec.get_fiber_times()
+            np.testing.assert_allclose(
+                times[:, 0], [0.0, 0.000025, 0.00005, 0.000075]
+            )
+
+    def test_npm_timestamp_unit_s_explicit(self):
+        """timestamp_unit='s' suppresses conversion regardless of interval."""
+        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "npm_data.csv"
+            # Inter-sample interval is 25 — heuristic would convert,
+            # but explicit "s" must leave the values unchanged.
+            csv_path.write_text(
+                "Timestamp,LedState,Region0G\n"
+                "0,1,100.0\n"
+                "25,1,101.0\n"
+                "50,1,102.0\n"
+                "75,1,103.0\n"
+            )
+
+            rec = NpmFiberPhotometryExtractor(
+                csv_path, stream_name="Region0G_led1", timestamp_unit="s"
+            )
+            times = rec.get_fiber_times()
+            np.testing.assert_allclose(times[:, 0], [0.0, 25.0, 50.0, 75.0])
+
+    def test_npm_timestamp_unit_invalid(self):
+        """timestamp_unit rejects values other than 's', 'ms', or None."""
+        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "npm_data.csv"
+            csv_path.write_text(
+                "Timestamp,LedState,Region0G\n0,1,100.0\n25,1,101.0\n"
+            )
+
+            with pytest.raises(ValueError, match="timestamp_unit"):
+                NpmFiberPhotometryExtractor(
+                    csv_path,
+                    stream_name="Region0G_led1",
+                    timestamp_unit="milliseconds",
+                )
 
     def test_npm_no_timestamp_column(self):
         """Test NPM file without timestamp column."""
