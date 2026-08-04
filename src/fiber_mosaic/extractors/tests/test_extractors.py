@@ -933,26 +933,6 @@ class TestDoricExtractor:
             assert "Signal" in names
             assert "Control" in names
 
-    def test_doric_get_streams_folder(self):
-        """Test stream discovery from folder."""
-        from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            csv_path = Path(tmpdir) / "doric_data.csv"
-            csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
-
-            names, ids = DoricFiberPhotometryExtractor.get_streams(tmpdir)
-            assert "Signal" in names
-
-    def test_doric_get_streams_empty_folder(self):
-        """Test stream discovery from empty folder."""
-        from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            names, ids = DoricFiberPhotometryExtractor.get_streams(tmpdir)
-            assert names == []
-            assert ids == []
-
     def test_doric_folder_resolution(self):
         """Test Doric file resolution from folder."""
         from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
@@ -2362,27 +2342,6 @@ class TestDoricExtractorFullCoverage:
                     )
                     np.testing.assert_array_equal(data, mock_data[0])
 
-    def test_doric_get_streams_doric_file_in_folder(self):
-        """Test get_streams finding .doric file in folder."""
-        from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            doric_path = Path(tmpdir) / "test.doric"
-            doric_path.touch()
-
-            with patch(
-                "fiber_mosaic.extractors.doric_extractor."
-                "_discover_doric_file_streams",
-                return_value=["Signal"],
-            ):
-                with patch(
-                    "fiber_mosaic.extractors.doric_extractor._check_h5py"
-                ):
-                    names, ids = DoricFiberPhotometryExtractor.get_streams(
-                        tmpdir
-                    )
-                    assert "Signal" in names
-
 
 # =============================================================================
 # NPM Extractor Full Coverage Tests
@@ -3408,8 +3367,10 @@ class TestDoricGuPPySampleSessions:
         """Stream discovery lists the V1 console channels."""
         from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
 
-        session_dir = RESOURCES_DIR / "doric" / "sample_doric_1"
-        names, _ = DoricFiberPhotometryExtractor.get_streams(str(session_dir))
+        doric_file = (
+            RESOURCES_DIR / "doric" / "sample_doric_1" / "D2-EPConsole_0039.doric"
+        )
+        names, _ = DoricFiberPhotometryExtractor.get_streams(doric_file)
         assert "AIn-1 - Raw" in names
         assert "AIn-2 - Raw" in names
         assert "DI--O-1" in names
