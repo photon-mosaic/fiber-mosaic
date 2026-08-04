@@ -75,17 +75,6 @@ def _find_nwb_file(folder_path: str | Path) -> Path:
     return nwb_files[0]
 
 
-def _get_ndx_events_version(io) -> str | None:  # pragma: no cover
-    """Get the ndx-events namespace version from an open NWBHDF5IO."""
-    try:
-        namespaces = io._file.attrs.get("namespace_versions", {})
-        if isinstance(namespaces, dict):
-            return namespaces.get("ndx-events")
-        return None
-    except Exception:
-        return None
-
-
 def _discover_fiber_photometry_series(nwbfile) -> dict[str, Any]:
     """
     Discover all FiberPhotometryResponseSeries in an NWB file.
