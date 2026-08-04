@@ -132,13 +132,32 @@ def _discover_doric_csv_streams(file_path: Path) -> list[str]:
     return [c for c in columns if c != "Time(s)"]
 
 
+def _get_v1_dataset(node, name: str):
+    """Resolve a Doric V1 entry that may be a dataset or a group.
+
+    Real exports nest 'Time(s)' and stream names as groups wrapping a
+    single dataset (e.g. 'Time(s)/Console_time(s)').
+    """
+    item = node[name]
+    if isinstance(item, h5py.Group):
+        keys = list(item.keys())
+        if name in keys:
+            return item[name]
+        if len(keys) == 1:
+            return item[keys[0]]
+        raise ValueError(
+            f"Cannot resolve dataset for '{name}': multiple candidates {keys}"
+        )
+    return item
+
+
 def _read_doric_v1_data(
     h5file, stream_name: str
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """Read data from Doric V1 format."""
     console = h5file["Traces"]["Console"]
-    timestamps = np.array(console["Time(s)"][:])
-    data = np.array(console[stream_name][:])
+    timestamps = np.array(_get_v1_dataset(console, "Time(s)")[:])
+    data = np.array(_get_v1_dataset(console, stream_name)[:])
 
     if len(timestamps) > 1:
         sampling_rate = 1.0 / np.median(np.diff(timestamps))
@@ -187,6 +206,33 @@ def _extract_v6_timestamps(data_group, data_len: int) -> np.ndarray:
     return np.arange(data_len)
 
 
+def _find_v6_parent_dataset(group, target_parts):
+    """Find a group directly containing a dataset named target_parts[-1].
+
+    target_parts[:-1] gives its nesting path. Handles Doric V6 exports
+    where the leaf value is stored as a dataset alongside a sibling
+    "Time" dataset, rather than inside its own "Values"-bearing group
+    (e.g. multi-ROI groups like CAM1_EXC1/{ROI01,ROI02,ROI03,Time}).
+    """
+    if len(target_parts) == 1:
+        name = target_parts[0]
+        if name in group and isinstance(group[name], h5py.Dataset):
+            return group, name
+        return None
+
+    for key in group.keys():
+        item = group[key]
+        if isinstance(item, h5py.Group):
+            if key == target_parts[0]:
+                result = _find_v6_parent_dataset(item, target_parts[1:])
+                if result is not None:
+                    return result
+            result = _find_v6_parent_dataset(item, target_parts)
+            if result is not None:
+                return result
+    return None
+
+
 def _read_doric_v6_data(
     h5file, stream_name: str
 ) -> tuple[np.ndarray, np.ndarray, float]:
@@ -194,11 +240,16 @@ def _read_doric_v6_data(
     parts = stream_name.split("/")
     data_group = _find_v6_group(h5file["DataAcquisition"], parts)
 
-    if data_group is None:
-        raise ValueError(f"Could not find data for stream: {stream_name}")
-
-    data = _extract_v6_data(data_group, stream_name)
-    timestamps = _extract_v6_timestamps(data_group, len(data))
+    if data_group is not None:
+        data = _extract_v6_data(data_group, stream_name)
+        timestamps = _extract_v6_timestamps(data_group, len(data))
+    else:
+        found = _find_v6_parent_dataset(h5file["DataAcquisition"], parts)
+        if found is None:
+            raise ValueError(f"Could not find data for stream: {stream_name}")
+        parent_group, dataset_name = found
+        data = np.array(parent_group[dataset_name][:])
+        timestamps = _extract_v6_timestamps(parent_group, len(data))
 
     if len(timestamps) > 1:
         sampling_rate = 1.0 / np.median(np.diff(timestamps))
