@@ -191,8 +191,8 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     stream_name : str, optional
         Name of the stream to read (format: "ColumnName_ledN").
         If None and only one stream exists, it will be used automatically.
-    color : str, optional
-        Color/wavelength identifier. If None, uses the stream name.
+    color : str
+        Color/wavelength identifier (e.g. ``"green"``, ``"415nm"``).
     timestamp_unit : {"s", "ms"}, optional
         Unit of the ``Timestamp`` column. If None (default), the unit is
         inferred from the inter-sample interval. Pass ``"ms"`` or ``"s"``
@@ -260,9 +260,12 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         # Create fiber IDs
         fiber_ids = [stream_name]
 
-        # Use stream name as color if not provided
         if color is None:
-            color = stream_name
+            raise ValueError(
+                "color must be provided explicitly (e.g. color='green'). "
+                "NPM stream names encode channel and LED state "
+                "(e.g. 'G0_led2'), not illumination color."
+            )
 
         # Initialize base class
         super().__init__(

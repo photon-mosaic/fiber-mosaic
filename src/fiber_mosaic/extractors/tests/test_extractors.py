@@ -1080,7 +1080,7 @@ class TestNpmExtractor:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1"
+                csv_path, stream_name="Region0G_led1", color="green"
             )
             times = rec.get_fiber_times()
             # Converted to seconds: 0, 0.025, 0.05, 0.075
@@ -1102,7 +1102,7 @@ class TestNpmExtractor:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1"
+                csv_path, stream_name="Region0G_led1", color="green"
             )
             times = rec.get_fiber_times()
             np.testing.assert_allclose(times[:, 0], [0.0, 0.025, 0.05, 0.075])
@@ -1124,7 +1124,10 @@ class TestNpmExtractor:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1", timestamp_unit="ms"
+                csv_path,
+                stream_name="Region0G_led1",
+                color="green",
+                timestamp_unit="ms",
             )
             times = rec.get_fiber_times()
             np.testing.assert_allclose(
@@ -1148,7 +1151,10 @@ class TestNpmExtractor:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1", timestamp_unit="s"
+                csv_path,
+                stream_name="Region0G_led1",
+                color="green",
+                timestamp_unit="s",
             )
             times = rec.get_fiber_times()
             np.testing.assert_allclose(times[:, 0], [0.0, 25.0, 50.0, 75.0])
@@ -1179,9 +1185,22 @@ class TestNpmExtractor:
             csv_path.write_text("LedState,Region0G\n1,100.0\n1,101.0\n")
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1"
+                csv_path, stream_name="Region0G_led1", color="green"
             )
             assert rec.get_num_samples() == 2
+
+    def test_npm_color_required(self):
+        """Test that omitting color raises ValueError."""
+        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "npm_data.csv"
+            csv_path.write_text("Timestamp,LedState,Region0G\n0,1,100.0\n")
+
+            with pytest.raises(ValueError, match="color must be provided"):
+                NpmFiberPhotometryExtractor(
+                    csv_path, stream_name="Region0G_led1"
+                )
 
     def test_read_npm_convenience_function(self):
         """Test the convenience function."""
@@ -1194,7 +1213,7 @@ class TestNpmExtractor:
             csv_path.write_text("Timestamp,LedState,Region0G\n0,1,100.0\n")
 
             rec = read_npm_fiber_photometry(
-                csv_path, stream_name="Region0G_led1"
+                csv_path, stream_name="Region0G_led1", color="green"
             )
             assert rec.get_num_samples() == 1
 
@@ -1207,7 +1226,7 @@ class TestNpmExtractor:
             csv_path.write_text("Timestamp,Region0G\n0,100.0\n10,101.0\n")
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led0"
+                csv_path, stream_name="Region0G_led0", color="green"
             )
             assert rec.get_num_samples() == 2
 
@@ -1481,7 +1500,7 @@ class TestAdditionalCoverage:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1"
+                csv_path, stream_name="Region0G_led1", color="green"
             )
             assert rec.get_num_samples() == 2
 
@@ -1496,7 +1515,7 @@ class TestAdditionalCoverage:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1"
+                csv_path, stream_name="Region0G_led1", color="green"
             )
             assert rec.get_num_samples() == 2
 
@@ -1509,7 +1528,7 @@ class TestAdditionalCoverage:
             csv_path.write_text("Timestamp,LedState,Region0G\n0,1,100.0\n")
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1"
+                csv_path, stream_name="Region0G_led1", color="green"
             )
             assert rec.get_num_samples() == 1
 
@@ -3271,7 +3290,7 @@ class TestNpmBranchCoverage:
             csv_path.write_text(
                 "Timestamp,LedState,Region0G\n0,1,100.0\n1000,1,101.0\n"
             )
-            rec = NpmFiberPhotometryExtractor(str(csv_path))
+            rec = NpmFiberPhotometryExtractor(str(csv_path), color="green")
             assert rec.get_num_samples() == 2
 
 
