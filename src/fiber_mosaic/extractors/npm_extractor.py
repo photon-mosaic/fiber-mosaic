@@ -18,35 +18,6 @@ from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
 logger = logging.getLogger(__name__)
 
 
-def _find_npm_csv(folder_path: Path) -> Path | None:
-    """Find NPM CSV file in a folder."""
-    csv_files = list(folder_path.glob("*.csv"))
-
-    for csv_path in csv_files:
-        # Skip event files and files with specific prefixes
-        basename = csv_path.name.lower()
-        skip_prefixes = ["event", "chev", "chod", "chpr"]
-        if any(basename.startswith(prefix) for prefix in skip_prefixes):
-            continue
-
-        try:
-            df = pd.read_csv(csv_path, index_col=False, nrows=5)
-            columns = list(df.columns)
-
-            # NPM files typically have more than 3 columns and contain
-            # LED state or flags column
-            if len(columns) > 3:
-                cols_lower = [c.lower() for c in columns]
-                if any(x in cols_lower for x in ["ledstate", "flags", "led"]):
-                    return csv_path
-                # Also check for Region columns typical of NPM format
-                if any("region" in c.lower() for c in columns):
-                    return csv_path
-        except Exception:
-            continue
-
-    return None
-
 
 def _discover_npm_streams(file_path: Path) -> tuple[list[str], dict[str, int]]:
     """
@@ -216,7 +187,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     Parameters
     ----------
     file_path : str or Path
-        Path to the NPM CSV file or folder containing NPM files.
+        Path to the NPM CSV file.
     stream_name : str, optional
         Name of the stream to read (format: "ColumnName_ledN").
         If None and only one stream exists, it will be used automatically.
@@ -263,14 +234,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
         file_path = Path(file_path)
 
-        # Find NPM file
-        if file_path.is_dir():
-            npm_file = _find_npm_csv(file_path)
-            if npm_file is None:
-                msg = f"No NPM CSV file found in {file_path}"
-                raise FileNotFoundError(msg)
-            file_path = npm_file
-        elif not file_path.exists():
+        if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
         # Discover streams
@@ -336,14 +300,16 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
 
     @classmethod
-    def get_streams(cls, file_path: str) -> tuple[list[str], list[str]]:
+    def get_streams(
+        cls, file_path: str | Path
+    ) -> tuple[list[str], list[str]]:
         """
         Discover available streams in an NPM file.
 
         Parameters
         ----------
-        file_path : str
-            Path to the NPM CSV file or folder.
+        file_path : str or Path
+            Path to the NPM CSV file.
 
         Returns
         -------
@@ -352,15 +318,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         stream_ids : list of str
             Same as stream_names for NPM.
         """
-        file_path = Path(file_path)
-
-        if file_path.is_dir():
-            npm_file = _find_npm_csv(file_path)
-            if npm_file is None:
-                return [], []
-            file_path = npm_file
-
-        streams, _ = _discover_npm_streams(file_path)
+        streams, _ = _discover_npm_streams(Path(file_path))
         return streams, streams
 
 
@@ -378,7 +336,7 @@ def read_npm_fiber_photometry(
     Parameters
     ----------
     file_path : str or Path
-        Path to the NPM CSV file or folder.
+        Path to the NPM CSV file.
     stream_name : str, optional
         Name of the stream to read.
     color : str, optional
