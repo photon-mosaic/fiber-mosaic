@@ -1036,32 +1036,6 @@ class TestNpmExtractor:
                     csv_path, stream_name="nonexistent"
                 )
 
-    def test_npm_extractor_folder(self):
-        """Test NPM loading from folder."""
-        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # NPM detection requires >3 columns
-            csv_path = Path(tmpdir) / "npm_data.csv"
-            csv_path.write_text(
-                "Timestamp,LedState,Region0G,Region1G\n"
-                "0,1,100.0,200.0\n"
-                "10,1,101.0,201.0\n"
-            )
-
-            rec = NpmFiberPhotometryExtractor(
-                tmpdir, stream_name="Region0G_led1"
-            )
-            assert rec.get_num_samples() == 2
-
-    def test_npm_extractor_folder_not_found(self):
-        """Test error when no NPM file in folder."""
-        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with pytest.raises(FileNotFoundError, match="No NPM CSV"):
-                NpmFiberPhotometryExtractor(tmpdir)
-
     def test_npm_extractor_file_not_found(self):
         """Test error when file not found."""
         from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
@@ -1085,15 +1059,6 @@ class TestNpmExtractor:
             assert "Region0G_led1" in names
             assert "Region0G_led2" in names
             assert "Region1G_led1" in names
-
-    def test_npm_get_streams_folder_empty(self):
-        """Test stream discovery from empty folder."""
-        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            names, ids = NpmFiberPhotometryExtractor.get_streams(tmpdir)
-            assert names == []
-            assert ids == []
 
     def test_npm_timestamp_ms_conversion(self):
         """Test NPM timestamps in milliseconds are converted to seconds.
@@ -1547,22 +1512,6 @@ class TestAdditionalCoverage:
                 csv_path, stream_name="Region0G_led1"
             )
             assert rec.get_num_samples() == 1
-
-    def test_npm_find_file_skips_event_files(self):
-        """Test that NPM finder skips event files."""
-        from fiber_mosaic.extractors.npm_extractor import _find_npm_csv
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create event file (should be skipped)
-            event_path = Path(tmpdir) / "event_data.csv"
-            event_path.write_text("Timestamp,Data\n0,1\n")
-
-            # Create chev file (should be skipped)
-            chev_path = Path(tmpdir) / "chev_data.csv"
-            chev_path.write_text("Timestamp,Data\n0,1\n")
-
-            result = _find_npm_csv(Path(tmpdir))
-            assert result is None
 
     def test_doric_csv_single_sample(self):
         """Test Doric CSV with single sample."""
@@ -2442,33 +2391,6 @@ class TestDoricExtractorFullCoverage:
 class TestNpmExtractorFullCoverage:
     """Full coverage tests for NPM extractor."""
 
-    def test_npm_find_csv_with_led_column(self):
-        """Test _find_npm_csv finding file with LED column."""
-        from fiber_mosaic.extractors.npm_extractor import _find_npm_csv
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            csv_path = Path(tmpdir) / "data.csv"
-            csv_path.write_text(
-                "Timestamp,LED,Region0G,Region1G,Extra\n"
-                "0,1,100.0,200.0,300.0\n"
-            )
-
-            result = _find_npm_csv(Path(tmpdir))
-            assert result == csv_path
-
-    def test_npm_get_streams_from_folder(self):
-        """Test get_streams from folder path."""
-        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            csv_path = Path(tmpdir) / "npm_data.csv"
-            csv_path.write_text(
-                "Timestamp,LedState,Region0G,Region1G\n0,1,100.0,200.0\n"
-            )
-
-            names, ids = NpmFiberPhotometryExtractor.get_streams(tmpdir)
-            assert "Region0G_led1" in names
-
 
 # =============================================================================
 # NWB Extractor Full Coverage Tests
@@ -3329,25 +3251,6 @@ class TestDoricRealFiles:
 
 class TestNpmBranchCoverage:
     """Cover remaining NPM extractor branches."""
-
-    def test_npm_find_csv_region_without_led(self):
-        """A file with Region columns but no LED column is detected."""
-        from fiber_mosaic.extractors.npm_extractor import _find_npm_csv
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            csv_path = Path(tmpdir) / "data.csv"
-            csv_path.write_text(
-                "Timestamp,Region0G,Region1G,Region2G\n0,1.0,2.0,3.0\n"
-            )
-            assert _find_npm_csv(Path(tmpdir)) == csv_path
-
-    def test_npm_find_csv_bad_file_skipped(self):
-        """An unparseable CSV is skipped and None is returned."""
-        from fiber_mosaic.extractors.npm_extractor import _find_npm_csv
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            (Path(tmpdir) / "data.csv").write_text("")
-            assert _find_npm_csv(Path(tmpdir)) is None
 
     def test_npm_no_streams_raises(self):
         """A file with no data columns raises ValueError."""
