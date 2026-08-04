@@ -446,14 +446,14 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
 
     @classmethod
-    def get_streams(cls, file_path: str) -> tuple[list[str], list[str]]:
+    def get_streams(cls, file_path: str | Path) -> tuple[list[str], list[str]]:
         """
         Discover available streams in a Doric file.
 
         Parameters
         ----------
-        file_path : str
-            Path to the Doric file or folder.
+        file_path : str or Path
+            Path to a Doric file (.doric or .csv).
 
         Returns
         -------
@@ -463,15 +463,6 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
             Same as stream_names for Doric.
         """
         file_path = Path(file_path)
-
-        if file_path.is_dir():
-            doric_files, csv_files = _find_doric_files(file_path)
-            if doric_files:
-                file_path = doric_files[0]
-            elif csv_files:
-                file_path = csv_files[0]
-            else:
-                return [], []
 
         if file_path.suffix == ".doric":
             streams = _discover_doric_file_streams(file_path)
