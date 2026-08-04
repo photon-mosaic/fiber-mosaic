@@ -18,7 +18,6 @@ from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
 logger = logging.getLogger(__name__)
 
 
-
 def _discover_npm_streams(file_path: Path) -> tuple[list[str], dict[str, int]]:
     """
     Discover available channels and LED states in NPM file.
@@ -303,9 +302,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
 
     @classmethod
-    def get_streams(
-        cls, file_path: str | Path
-    ) -> tuple[list[str], list[str]]:
+    def get_streams(cls, file_path: str | Path) -> tuple[list[str], list[str]]:
         """
         Discover available streams in an NPM file.
 
