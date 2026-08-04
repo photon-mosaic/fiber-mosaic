@@ -1648,62 +1648,43 @@ class TestDoricHDF5Mock:
 class TestNWBMock:
     """Tests for NWB functionality with mocks."""
 
-    def test_resolve_timing_with_timestamps(self):
-        """Test timing resolution with timestamps."""
-        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
+    def test_nwb_no_timing_info(self):
+        """Test error when series has neither timestamps nor rate."""
+        from fiber_mosaic.extractors import NwbFiberPhotometryExtractor
 
-        # Create a mock series with timestamps
-        class MockSeries:
-            def __init__(self):
-                self.timestamps = [0.0, 0.1, 0.2, 0.3]
-                self.rate = None
+        with tempfile.TemporaryDirectory() as tmpdir:
+            nwb_path = Path(tmpdir) / "session.nwb"
+            nwb_path.touch()
 
-        mock_series = MockSeries()
-        sampling_rate, timestamps = _resolve_timing(mock_series, 4)
-        assert sampling_rate == pytest.approx(10.0, rel=0.1)
-        assert len(timestamps) == 4
+            mock_series = MagicMock()
+            mock_series.name = "FPSeries"
+            mock_series.neurodata_type = "FiberPhotometryResponseSeries"
+            mock_series.data.__getitem__ = lambda self, x: np.zeros((10, 1))
+            mock_series.data.shape = (10, 1)
+            mock_series.get_timestamps.return_value = None
+            mock_series.rate = None
 
-    def test_resolve_timing_with_rate(self):
-        """Test timing resolution with rate only."""
-        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
+            mock_nwbfile = MagicMock()
+            mock_nwbfile.objects.values.return_value = [mock_series]
 
-        class MockSeries:
-            def __init__(self):
-                self.timestamps = None
-                self.rate = 100.0
-                self.starting_time = 0.0
+            mock_io = MagicMock()
+            mock_io.read.return_value = mock_nwbfile
+            mock_io.__enter__ = MagicMock(return_value=mock_io)
+            mock_io.__exit__ = MagicMock(return_value=False)
 
-        mock_series = MockSeries()
-        sampling_rate, timestamps = _resolve_timing(mock_series, 100)
-        assert sampling_rate == 100.0
-        assert len(timestamps) == 100
-
-    def test_resolve_timing_single_timestamp(self):
-        """Test timing resolution with single timestamp."""
-        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
-
-        class MockSeries:
-            def __init__(self):
-                self.timestamps = [0.0]
-                self.rate = 100.0
-
-        mock_series = MockSeries()
-        sampling_rate, timestamps = _resolve_timing(mock_series, 1)
-        assert sampling_rate == 100.0
-
-    def test_resolve_timing_no_timing_info(self):
-        """Test timing resolution without any timing info."""
-        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
-
-        class MockSeries:
-            def __init__(self):
-                self.timestamps = None
-                self.rate = None
-                self.name = "test_series"
-
-        mock_series = MockSeries()
-        with pytest.raises(ValueError, match="neither timestamps nor rate"):
-            _resolve_timing(mock_series, 100)
+            with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
+                with patch(
+                    "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+                    return_value=mock_io,
+                ):
+                    with pytest.raises(
+                        ValueError, match="neither timestamps nor rate"
+                    ):
+                        NwbFiberPhotometryExtractor(
+                            str(nwb_path),
+                            series_name="FPSeries",
+                            color="green",
+                        )
 
 
 class TestDANDIMock:
@@ -2436,12 +2417,8 @@ class TestNwbExtractorFullCoverage:
             mock_series.data = MagicMock()
             mock_series.data.__getitem__ = lambda self, x: mock_data
             mock_series.data.shape = mock_data.shape
-            mock_series.timestamps = MagicMock()
-            mock_series.timestamps.__getitem__ = lambda self, x: (
-                mock_timestamps
-            )
-            mock_series.timestamps.__len__ = lambda self: len(mock_timestamps)
-            mock_series.timestamps.__bool__ = lambda self: True
+            mock_series.get_timestamps.return_value = mock_timestamps
+            mock_series.rate = None
 
             mock_nwbfile = MagicMock()
             mock_nwbfile.objects.values.return_value = [mock_series]
@@ -2605,12 +2582,8 @@ class TestNwbExtractorFullCoverage:
             mock_series.data = MagicMock()
             mock_series.data.__getitem__ = lambda self, x: mock_data
             mock_series.data.shape = mock_data.shape
-            mock_series.timestamps = MagicMock()
-            mock_series.timestamps.__getitem__ = lambda self, x: (
-                mock_timestamps
-            )
-            mock_series.timestamps.__len__ = lambda self: len(mock_timestamps)
-            mock_series.timestamps.__bool__ = lambda self: True
+            mock_series.get_timestamps.return_value = mock_timestamps
+            mock_series.rate = None
 
             mock_nwbfile = MagicMock()
             mock_nwbfile.objects.values.return_value = [mock_series]
@@ -2627,34 +2600,6 @@ class TestNwbExtractorFullCoverage:
                 ):
                     rec = read_nwb_fiber_photometry(str(nwb_path))
                     assert rec.get_num_fibers() == 1
-
-    def test_nwb_resolve_timing_single_timestamp_no_rate(self):
-        """Test timing with single timestamp and no rate."""
-        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
-
-        class MockSeries:
-            def __init__(self):
-                self.timestamps = [0.0]
-                self.rate = None
-
-        mock_series = MockSeries()
-        sampling_rate, timestamps = _resolve_timing(mock_series, 1)
-        assert sampling_rate == 1.0
-
-    def test_nwb_resolve_timing_rate_no_starting_time(self):
-        """Test timing with rate but no starting_time."""
-        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
-
-        class MockSeries:
-            def __init__(self):
-                self.timestamps = None
-                self.rate = 100.0
-                # No starting_time attribute
-
-        mock_series = MockSeries()
-        sampling_rate, timestamps = _resolve_timing(mock_series, 100)
-        assert sampling_rate == 100.0
-        assert timestamps[0] == 0.0
 
 
 # =============================================================================
