@@ -88,6 +88,25 @@ def _discover_npm_streams(file_path: Path) -> tuple[list[str], dict[str, int]]:
     return streams, led_mapping
 
 
+def _resolve_npm_stream(
+    available_streams: list[str],
+    stream_name: str | None,
+) -> str:
+    """Resolve a stream name, auto-selecting when only one stream exists."""
+    if stream_name is None:
+        if len(available_streams) == 1:
+            return available_streams[0]
+        raise ValueError(
+            f"Multiple streams found: {available_streams}. "
+            "Please specify stream_name."
+        )
+    if stream_name not in available_streams:
+        raise ValueError(
+            f"Stream '{stream_name}' not found. Available: {available_streams}"
+        )
+    return stream_name
+
+
 def _find_npm_column(columns: list[str], candidates: list[str]) -> str | None:
     """Find a column matching one of the candidate names (case-insensitive)."""
     for col in columns:
@@ -96,18 +115,34 @@ def _find_npm_column(columns: list[str], candidates: list[str]) -> str | None:
     return None
 
 
+def _timestamps_in_milliseconds(timestamps: np.ndarray) -> bool:
+    """Return True if timestamps appear to be in milliseconds.
+
+    Checks the median inter-sample interval: at any physiological sampling
+    rate (1–200 Hz) a millisecond timebase produces intervals well above 1,
+    while a second timebase produces intervals well below 1.
+    """
+    if len(timestamps) < 2:
+        return False
+    return float(np.median(np.diff(timestamps))) > 1.0
+
+
 def _extract_npm_timestamps(
     df_filtered: pd.DataFrame,
     ts_col: str | None,
+    timestamp_unit: str | None = None,
 ) -> np.ndarray:
     """Extract timestamps from filtered NPM dataframe."""
     if ts_col is None:
         return np.arange(len(df_filtered))
 
     timestamps = df_filtered[ts_col].to_numpy()
-    # Check if timestamps are in milliseconds
-    if ts_col.lower() == "timestamp" and timestamps.max() > 1e6:
-        timestamps = timestamps / 1000.0
+    if ts_col.lower() == "timestamp":
+        in_ms = timestamp_unit == "ms" or (
+            timestamp_unit is None and _timestamps_in_milliseconds(timestamps)
+        )
+        if in_ms:
+            timestamps = timestamps / 1000.0
     return timestamps
 
 
@@ -115,6 +150,7 @@ def _read_npm_data(
     file_path: Path,
     column_name: str,
     led_state: int,
+    timestamp_unit: str | None = None,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """
     Read data for a specific channel and LED state from NPM file.
@@ -155,7 +191,7 @@ def _read_npm_data(
 
     # Extract data and timestamps
     data = df_filtered[column_name].to_numpy()
-    timestamps = _extract_npm_timestamps(df_filtered, ts_col)
+    timestamps = _extract_npm_timestamps(df_filtered, ts_col, timestamp_unit)
 
     # Calculate sampling rate
     if len(timestamps) > 1:
@@ -186,6 +222,10 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         If None and only one stream exists, it will be used automatically.
     color : str, optional
         Color/wavelength identifier. If None, uses the stream name.
+    timestamp_unit : {"s", "ms"}, optional
+        Unit of the ``Timestamp`` column. If None (default), the unit is
+        inferred from the inter-sample interval. Pass ``"ms"`` or ``"s"``
+        to override the heuristic when the file's unit is known.
 
     Examples
     --------
@@ -213,7 +253,14 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         file_path: str | Path,
         stream_name: str | None = None,
         color: str | None = None,
+        timestamp_unit: str | None = None,
     ):
+        if timestamp_unit not in (None, "s", "ms"):
+            raise ValueError(
+                f"timestamp_unit must be 's', 'ms', or None, "
+                f"got {timestamp_unit!r}"
+            )
+
         file_path = Path(file_path)
 
         # Find NPM file
@@ -232,28 +279,14 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         if not available_streams:
             raise ValueError(f"No streams found in {file_path}")
 
-        # Select stream
-        if stream_name is None:
-            if len(available_streams) == 1:
-                stream_name = available_streams[0]
-            else:
-                raise ValueError(
-                    f"Multiple streams found: {available_streams}. "
-                    "Please specify stream_name."
-                )
-
-        if stream_name not in available_streams:
-            raise ValueError(
-                f"Stream '{stream_name}' not found. "
-                f"Available: {available_streams}"
-            )
+        stream_name = _resolve_npm_stream(available_streams, stream_name)
 
         # Get column and LED state
         column_name, led_state = led_mapping[stream_name]
 
         # Read data
         data, timestamps, sampling_rate = _read_npm_data(
-            file_path, column_name, led_state
+            file_path, column_name, led_state, timestamp_unit
         )
 
         # Ensure data is 2D
@@ -291,6 +324,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
             "file_path": str(file_path),
             "stream_name": stream_name,
             "color": color,
+            "timestamp_unit": timestamp_unit,
         }
 
         logger.info(
@@ -334,6 +368,7 @@ def read_npm_fiber_photometry(
     file_path: str | Path,
     stream_name: str | None = None,
     color: str | None = None,
+    timestamp_unit: str | None = None,
 ) -> NpmFiberPhotometryExtractor:
     """
     Read fiber photometry data from an NPM (Neurophotometrics) file.
@@ -348,6 +383,8 @@ def read_npm_fiber_photometry(
         Name of the stream to read.
     color : str, optional
         Color/wavelength identifier.
+    timestamp_unit : {"s", "ms"}, optional
+        Unit of the ``Timestamp`` column. If None, inferred automatically.
 
     Returns
     -------
@@ -358,4 +395,5 @@ def read_npm_fiber_photometry(
         file_path=file_path,
         stream_name=stream_name,
         color=color,
+        timestamp_unit=timestamp_unit,
     )
