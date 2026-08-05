@@ -209,8 +209,10 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         A DANDI URI of the form ``dandi://DANDISET_ID/asset/path.nwb``.
     series_name : str, optional
         Name of the FiberPhotometryResponseSeries to read.
-    color : str, optional
-        Color/wavelength identifier. If None, uses the series name.
+    color : str
+        Color/wavelength identifier (e.g. ``"green"``, ``"415nm"``).
+        Must be provided explicitly; NWB series names encode the
+        experimental signal, not illumination color.
 
     Examples
     --------
@@ -287,9 +289,12 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
             # Get timing
             sampling_rate, timestamps = _resolve_timing(series, n_samples)
 
-            # Use series name as color if not provided
             if color is None:
-                color = series_name
+                raise ValueError(
+                    "color must be provided explicitly (e.g. color='green'). "
+                    "NWB series names encode the experimental signal, "
+                    "not illumination color."
+                )
 
         finally:
             # Close the streaming connection
@@ -381,7 +386,7 @@ def read_dandi_fiber_photometry(
         A DANDI URI of the form ``dandi://DANDISET_ID/asset/path.nwb``.
     series_name : str, optional
         Name of the FiberPhotometryResponseSeries to read.
-    color : str, optional
+    color : str
         Color/wavelength identifier.
 
     Returns

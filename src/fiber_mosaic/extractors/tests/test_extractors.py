@@ -1808,7 +1808,7 @@ class TestDandiExtractorFullCoverage:
             ):
                 # No series_name specified - should auto-select
                 rec = DandiFiberPhotometryExtractor(
-                    "dandi://000123/sub-1/file.nwb"
+                    "dandi://000123/sub-1/file.nwb", color="green"
                 )
                 assert rec.get_num_fibers() == 1
 
@@ -2756,6 +2756,41 @@ class TestNwbExtractorFullCoverage:
                     )
                     assert rec.get_sampling_frequency() == 1.0
 
+    def test_dandi_no_color_raises(self):
+        """Test error when color is not provided."""
+        from fiber_mosaic.extractors import DandiFiberPhotometryExtractor
+
+        mock_data = np.random.randn(100)
+        mock_timestamps = np.linspace(0, 10, 100)
+
+        mock_series = MagicMock()
+        mock_series.name = "OnlySeries"
+        mock_series.neurodata_type = "FiberPhotometryResponseSeries"
+        mock_series.data = MagicMock()
+        mock_series.data.__getitem__ = lambda self, x: mock_data
+        mock_series.data.shape = mock_data.shape
+        mock_series.timestamps = MagicMock()
+        mock_series.timestamps.__getitem__ = lambda self, x: mock_timestamps
+        mock_series.timestamps.__len__ = lambda self: len(mock_timestamps)
+        mock_series.timestamps.__bool__ = lambda self: True
+
+        mock_nwbfile = MagicMock()
+        mock_nwbfile.objects.values.return_value = [mock_series]
+
+        mock_io = MagicMock()
+
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"
+        ):
+            with patch(
+                "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+                return_value=(mock_nwbfile, mock_io),
+            ):
+                with pytest.raises(ValueError, match="color must be provided"):
+                    DandiFiberPhotometryExtractor(
+                        "dandi://000123/sub-1/file.nwb"
+                    )
+
 
 # =============================================================================
 # TDT Extractor Full Coverage Tests
@@ -3110,9 +3145,11 @@ class TestTdtExtractorFullCoverage:
             data = np.arange(80, dtype=np.float32)
             data.tofile(str(tev_path))
 
-            rec = TdtFiberPhotometryExtractor(tmpdir, store_name="Dv1A")
+            rec = TdtFiberPhotometryExtractor(
+                tmpdir, store_name="Dv1A", color="green"
+            )
             assert rec.get_num_samples() == 80
-            assert rec.color == "Dv1A"
+            assert rec.color == "green"
 
     def test_tdt_get_streams(self):
         """Test TdtFiberPhotometryExtractor.get_streams."""
@@ -3197,7 +3234,9 @@ class TestTdtExtractorFullCoverage:
             data = np.arange(40, dtype=np.float32)
             data.tofile(str(tev_path))
 
-            rec = read_tdt_fiber_photometry(tmpdir, store_name="Dv1A")
+            rec = read_tdt_fiber_photometry(
+                tmpdir, store_name="Dv1A", color="green"
+            )
             assert rec.get_num_samples() == 40
 
 
@@ -3444,8 +3483,53 @@ class TestTdtBranchCoverage:
 
             np.arange(40, dtype=np.float32).tofile(str(tev_path))
 
-            rec = TdtFiberPhotometryExtractor(tmpdir)
+            rec = TdtFiberPhotometryExtractor(tmpdir, color="green")
             assert rec.get_num_samples() == 40
+
+    def test_tdt_no_color_raises(self):
+        """Test error when color is not provided."""
+        from fiber_mosaic.extractors import TdtFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tsq_path = Path(tmpdir) / "test.tsq"
+            tev_path = Path(tmpdir) / "test.tev"
+
+            dtype = np.dtype(
+                {
+                    "names": (
+                        "size",
+                        "type",
+                        "name",
+                        "chan",
+                        "sort_code",
+                        "timestamp",
+                        "fp_loc",
+                        "format",
+                        "frequency",
+                    ),
+                    "formats": (
+                        np.int32,
+                        np.int32,
+                        "S4",
+                        np.uint16,
+                        np.uint16,
+                        np.float64,
+                        np.int64,
+                        np.int32,
+                        np.float32,
+                    ),
+                    "offsets": (0, 4, 8, 12, 14, 16, 24, 32, 36),
+                },
+                align=True,
+            )
+            record = np.array(
+                [(50, 2, b"Dv1A", 1, 0, 0.0, 0, 0, 1000.0)], dtype=dtype
+            )
+            record.tofile(str(tsq_path))
+            np.arange(40, dtype=np.float32).tofile(str(tev_path))
+
+            with pytest.raises(ValueError, match="color must be provided"):
+                TdtFiberPhotometryExtractor(tmpdir, store_name="Dv1A")
 
 
 RESOURCES_DIR = Path(__file__).resolve().parents[4] / "resources"

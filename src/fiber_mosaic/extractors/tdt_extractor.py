@@ -180,8 +180,10 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     store_name : str, optional
         Name of the store to read. If None and only one photometry store
         exists, it will be used automatically.
-    color : str, optional
-        Color/wavelength identifier. If None, uses the store name.
+    color : str
+        Color/wavelength identifier (e.g. ``"green"``, ``"415nm"``).
+        Must be provided explicitly; TDT store names encode signal type,
+        not illumination color.
 
     Examples
     --------
@@ -266,9 +268,12 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         # Create fiber IDs
         fiber_ids = [store_name]
 
-        # Use store name as color if not provided
         if color is None:
-            color = store_name
+            raise ValueError(
+                "color must be provided explicitly (e.g. color='green'). "
+                "TDT store names encode signal type "
+                "(e.g. 'x65A'), not illumination color."
+            )
 
         # Initialize base class
         super().__init__(
@@ -345,7 +350,7 @@ def read_tdt_fiber_photometry(
         Path to folder containing TDT files.
     store_name : str, optional
         Name of the store to read.
-    color : str, optional
+    color : str
         Color/wavelength identifier.
 
     Returns
