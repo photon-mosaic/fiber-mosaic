@@ -1742,15 +1742,13 @@ class TestDandiExtractorFullCoverage:
         mocks."""
         from fiber_mosaic.extractors import DandiFiberPhotometryExtractor
 
-        mock_data = np.random.randn(100, 2)
         mock_timestamps = np.linspace(0, 10, 100)
 
         mock_series = MagicMock()
         mock_series.name = "GCaMP"
         mock_series.neurodata_type = "FiberPhotometryResponseSeries"
-        mock_series.data = MagicMock()
-        mock_series.data.__getitem__ = lambda self, x: mock_data
-        mock_series.data.shape = mock_data.shape
+        mock_series.data.shape = (100, 2)
+        mock_series.data.dtype = np.float64
         mock_series.timestamps = MagicMock()
         mock_series.timestamps.__getitem__ = lambda self, x: mock_timestamps
         mock_series.timestamps.__len__ = lambda self: len(mock_timestamps)
@@ -1775,20 +1773,20 @@ class TestDandiExtractorFullCoverage:
                 )
                 assert rec.get_num_fibers() == 2
                 assert rec.color == "green"
+                # Data not loaded during init — __getitem__ never called
+                mock_series.data.__getitem__.assert_not_called()
 
     def test_dandi_extractor_auto_series_selection(self):
         """Test auto series selection when only one series exists."""
         from fiber_mosaic.extractors import DandiFiberPhotometryExtractor
 
-        mock_data = np.random.randn(100)
         mock_timestamps = np.linspace(0, 10, 100)
 
         mock_series = MagicMock()
         mock_series.name = "OnlySeries"
         mock_series.neurodata_type = "FiberPhotometryResponseSeries"
-        mock_series.data = MagicMock()
-        mock_series.data.__getitem__ = lambda self, x: mock_data
-        mock_series.data.shape = mock_data.shape
+        mock_series.data.shape = (100,)  # 1-D series → 1 fiber
+        mock_series.data.dtype = np.float64
         mock_series.timestamps = MagicMock()
         mock_series.timestamps.__getitem__ = lambda self, x: mock_timestamps
         mock_series.timestamps.__len__ = lambda self: len(mock_timestamps)
@@ -1806,7 +1804,6 @@ class TestDandiExtractorFullCoverage:
                 "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
                 return_value=(mock_nwbfile, mock_io),
             ):
-                # No series_name specified - should auto-select
                 rec = DandiFiberPhotometryExtractor(
                     "dandi://000123/sub-1/file.nwb", color="green"
                 )
@@ -1922,15 +1919,13 @@ class TestDandiExtractorFullCoverage:
             read_dandi_fiber_photometry,
         )
 
-        mock_data = np.random.randn(100)
         mock_timestamps = np.linspace(0, 10, 100)
 
         mock_series = MagicMock()
         mock_series.name = "GCaMP"
         mock_series.neurodata_type = "FiberPhotometryResponseSeries"
-        mock_series.data = MagicMock()
-        mock_series.data.__getitem__ = lambda self, x: mock_data
-        mock_series.data.shape = mock_data.shape
+        mock_series.data.shape = (100,)
+        mock_series.data.dtype = np.float64
         mock_series.timestamps = MagicMock()
         mock_series.timestamps.__getitem__ = lambda self, x: mock_timestamps
         mock_series.timestamps.__len__ = lambda self: len(mock_timestamps)
@@ -1996,6 +1991,137 @@ class TestDandiExtractorFullCoverage:
         sampling_rate, timestamps = _resolve_timing(mock_series, 100)
         assert sampling_rate == 100.0
         assert timestamps[0] == 0.0
+
+    def test_dandi_extractor_lazy_get_fluorescence(self):
+        """Test that get_fluorescence streams data after lazy init."""
+        from fiber_mosaic.extractors import DandiFiberPhotometryExtractor
+
+        mock_data_2d = np.ones((100, 2), dtype=np.float64)
+        mock_timestamps = np.linspace(0, 10, 100)
+
+        mock_series = MagicMock()
+        mock_series.name = "GCaMP"
+        mock_series.neurodata_type = "FiberPhotometryResponseSeries"
+        mock_series.data.shape = (100, 2)
+        mock_series.data.dtype = np.float64
+        # __getitem__ returns sliced data when get_traces() is called
+        mock_series.data.__getitem__ = MagicMock(return_value=mock_data_2d)
+        mock_series.timestamps = MagicMock()
+        mock_series.timestamps.__getitem__ = lambda self, x: mock_timestamps
+        mock_series.timestamps.__len__ = lambda self: len(mock_timestamps)
+        mock_series.timestamps.__bool__ = lambda self: True
+
+        mock_nwbfile = MagicMock()
+        mock_nwbfile.objects.values.return_value = [mock_series]
+        mock_io = MagicMock()
+
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"
+        ):
+            with patch(
+                "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+                return_value=(mock_nwbfile, mock_io),
+            ) as mock_stream:
+                rec = DandiFiberPhotometryExtractor(
+                    "dandi://000123/sub-1/file.nwb",
+                    series_name="GCaMP",
+                    color="green",
+                )
+                # _stream_nwb called once (metadata); no data loaded yet
+                assert mock_stream.call_count == 1
+                mock_series.data.__getitem__.assert_not_called()
+
+                # get_fluorescence triggers a second _stream_nwb call
+                traces = rec.get_fluorescence()
+                assert mock_stream.call_count == 2
+                assert traces.shape == (100, 2)
+
+    def test_dandi_segment_get_num_samples(self):
+        """Test DandiRecordingSegment.get_num_samples."""
+        from fiber_mosaic.extractors.dandi_extractor import (
+            DandiRecordingSegment,
+        )
+
+        seg = DandiRecordingSegment(
+            dandi_uri="dandi://000123/sub-1/file.nwb",
+            series_name="GCaMP",
+            n_samples=50,
+            n_channels=1,
+            dtype=np.float64,
+            sampling_frequency=100.0,
+            t_start=0.0,
+        )
+        assert seg.get_num_samples() == 50
+
+    def test_dandi_segment_get_traces_none_bounds(self):
+        """Test DandiRecordingSegment.get_traces with None start/end."""
+        from fiber_mosaic.extractors.dandi_extractor import (
+            DandiRecordingSegment,
+        )
+
+        raw = np.arange(10, dtype=np.float64)
+        mock_series = MagicMock()
+        mock_series.neurodata_type = "FiberPhotometryResponseSeries"
+        mock_series.data.__getitem__ = MagicMock(return_value=raw)
+        mock_nwbfile = MagicMock()
+        mock_nwbfile.objects.values.return_value = [mock_series]
+        mock_io = MagicMock()
+
+        seg = DandiRecordingSegment(
+            dandi_uri="dandi://000123/sub-1/file.nwb",
+            series_name=mock_series.name,
+            n_samples=10,
+            n_channels=1,
+            dtype=np.float64,
+            sampling_frequency=100.0,
+            t_start=0.0,
+        )
+
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+            return_value=(mock_nwbfile, mock_io),
+        ):
+            # start_frame=None, end_frame=None → defaults to 0:n_samples
+            result = seg.get_traces(
+                start_frame=None, end_frame=None, channel_indices=None
+            )
+        assert result.shape == (10, 1)  # 1D raw expanded to 2D
+
+    def test_dandi_segment_get_traces_with_channel_indices(self):
+        """Test DandiRecordingSegment.get_traces with channel selection."""
+        from fiber_mosaic.extractors.dandi_extractor import (
+            DandiRecordingSegment,
+        )
+
+        raw = np.ones((20, 3), dtype=np.float32)
+        mock_series = MagicMock()
+        mock_series.neurodata_type = "FiberPhotometryResponseSeries"
+        mock_series.data.__getitem__ = MagicMock(return_value=raw)
+        mock_nwbfile = MagicMock()
+        mock_nwbfile.objects.values.return_value = [mock_series]
+        mock_io = MagicMock()
+
+        seg = DandiRecordingSegment(
+            dandi_uri="dandi://000123/sub-1/file.nwb",
+            series_name=mock_series.name,
+            n_samples=20,
+            n_channels=3,
+            dtype=np.float64,
+            sampling_frequency=50.0,
+            t_start=0.0,
+        )
+
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+            return_value=(mock_nwbfile, mock_io),
+        ):
+            result = seg.get_traces(
+                start_frame=0,
+                end_frame=20,
+                channel_indices=[0, 2],
+            )
+        assert result.shape == (20, 2)
+        assert result.dtype == np.float64
 
 
 # =============================================================================

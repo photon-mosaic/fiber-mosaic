@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 import numpy as np
+from spikeinterface.core import BaseRecordingSegment
 
 from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
 
@@ -195,6 +196,101 @@ def _resolve_timing(series, n_samples: int) -> tuple[float, np.ndarray]:
     return sampling_rate, timestamps
 
 
+class DandiRecordingSegment(BaseRecordingSegment):
+    """
+    Recording segment that streams data from DANDI on demand.
+
+    Data is not loaded until :meth:`get_traces` is called, keeping
+    ``__init__`` lightweight even for large remote datasets.
+
+    Parameters
+    ----------
+    dandi_uri : str
+        DANDI URI of the source NWB file.
+    series_name : str
+        Name of the FiberPhotometryResponseSeries to stream.
+    n_samples : int
+        Total number of samples (from ``series.data.shape[0]``).
+    n_channels : int
+        Number of channels (1 for 1-D series, else
+        ``series.data.shape[1]``).
+    dtype : np.dtype
+        Data type (from ``series.data.dtype``).
+    sampling_frequency : float
+        Sampling rate in Hz.
+    t_start : float
+        Start time in seconds.
+    """
+
+    def __init__(
+        self,
+        dandi_uri: str,
+        series_name: str,
+        n_samples: int,
+        n_channels: int,
+        dtype,
+        sampling_frequency: float,
+        t_start: float,
+    ):
+        super().__init__(
+            sampling_frequency=sampling_frequency,
+            t_start=t_start,
+        )
+        self._dandi_uri = dandi_uri
+        self._series_name = series_name
+        self._n_samples = n_samples
+        self._n_channels = n_channels
+        self._dtype = dtype
+
+    def get_num_samples(self) -> int:
+        """Return the number of samples in this segment."""
+        return self._n_samples
+
+    def get_traces(
+        self,
+        start_frame: int | None = None,
+        end_frame: int | None = None,
+        channel_indices=None,
+    ) -> np.ndarray:
+        """
+        Stream a slice of fluorescence data from DANDI.
+
+        Opens a new connection per call; DANDI connections are not
+        meant to be held open across calls.
+
+        Parameters
+        ----------
+        start_frame : int, optional
+            First frame to read (inclusive). Defaults to 0.
+        end_frame : int, optional
+            Last frame to read (exclusive). Defaults to ``n_samples``.
+        channel_indices : array-like, optional
+            Channel indices to return. If None, all channels returned.
+
+        Returns
+        -------
+        np.ndarray
+            Data array of shape ``(n_frames, n_channels)``.
+        """
+        start = 0 if start_frame is None else int(start_frame)
+        end = self._n_samples if end_frame is None else int(end_frame)
+
+        dandiset_id, asset_path = parse_dandi_uri(self._dandi_uri)
+        nwbfile, io = _stream_nwb(dandiset_id, asset_path)
+        try:
+            series_dict = _discover_fiber_photometry_series(nwbfile)
+            series = series_dict[self._series_name]
+            raw = np.array(series.data[start:end])
+        finally:
+            io.close()
+
+        if raw.ndim == 1:
+            raw = raw[:, np.newaxis]
+        if channel_indices is not None:
+            raw = raw[:, channel_indices]
+        return raw.astype(self._dtype)
+
+
 class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     """
     Extractor that streams fiber photometry data from the DANDI Archive.
@@ -243,11 +339,10 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
         logger.info("Streaming from DANDI: %s/%s", dandiset_id, asset_path)
 
-        # Open streaming connection
+        # Read metadata only — bulk trace data is deferred to get_traces()
         nwbfile, io = _stream_nwb(dandiset_id, asset_path)
 
         try:
-            # Discover available series
             series_dict = _discover_fiber_photometry_series(nwbfile)
 
             if not series_dict:
@@ -255,13 +350,13 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
                     f"No FiberPhotometryResponseSeries found in {dandi_uri}"
                 )
 
-            # Select series
             if series_name is None:
                 if len(series_dict) == 1:
                     series_name = list(series_dict.keys())[0]
                 else:
                     raise ValueError(
-                        f"Multiple series found: {list(series_dict.keys())}. "
+                        f"Multiple series found: "
+                        f"{list(series_dict.keys())}. "
                         "Please specify series_name."
                     )
 
@@ -273,43 +368,51 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
             series = series_dict[series_name]
 
-            # Read data (this streams from DANDI)
-            data = np.array(series.data[:])
-            n_samples = data.shape[0]
-
-            # Handle multi-channel data
-            if data.ndim == 1:
-                data = data[:, np.newaxis]
+            # Shape and dtype are HDF5 metadata — no data loaded here
+            data_shape = series.data.shape
+            n_samples = data_shape[0]
+            if len(data_shape) == 1:
+                n_channels = 1
                 fiber_ids = [series_name]
             else:
-                n_channels = data.shape[1]
+                n_channels = data_shape[1]
                 fiber_ids = [f"{series_name}_{i}" for i in range(n_channels)]
+            dtype = series.data.dtype
 
-            # Get timing
+            # Timestamps are a lightweight 1-D array; read them now
             sampling_rate, timestamps = _resolve_timing(series, n_samples)
 
-            if color is None:
-                raise ValueError(
-                    "color must be provided explicitly (e.g. color='green'). "
-                    "NWB series names encode the experimental signal, "
-                    "not illumination color."
-                )
-
         finally:
-            # Close the streaming connection
             io.close()
 
-        # Initialize base class
+        if color is None:
+            raise ValueError(
+                "color must be provided explicitly (e.g. color='green'). "
+                "NWB series names encode the experimental signal, "
+                "not illumination color."
+            )
+
+        t_start = float(timestamps[0]) if len(timestamps) > 0 else 0.0
+
         super().__init__(
             sampling_frequency=sampling_rate,
             fiber_ids=fiber_ids,
             color=color,
-            dtype=data.dtype,
+            dtype=dtype,
         )
 
-        self._add_numpy_segment(data, timestamps)
+        segment = DandiRecordingSegment(
+            dandi_uri=dandi_uri,
+            series_name=series_name,
+            n_samples=n_samples,
+            n_channels=n_channels,
+            dtype=dtype,
+            sampling_frequency=sampling_rate,
+            t_start=t_start,
+        )
+        self.add_segment(segment)
+        self.set_times(timestamps)
 
-        # Store kwargs
         self._kwargs = {
             "dandi_uri": dandi_uri,
             "series_name": series_name,
