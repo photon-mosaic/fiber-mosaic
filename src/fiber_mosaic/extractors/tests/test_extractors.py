@@ -2350,6 +2350,54 @@ class TestDoricExtractorFullCoverage:
 class TestNpmExtractorFullCoverage:
     """Full coverage tests for NPM extractor."""
 
+    def test_npm_timestamp_column_not_found(self):
+        """Test error when an explicit timestamp_column does not exist."""
+        from fiber_mosaic.extractors.npm_extractor import (
+            _resolve_npm_timestamp_column,
+        )
+
+        with pytest.raises(ValueError, match="timestamp_column 'Missing'"):
+            _resolve_npm_timestamp_column(
+                ["Timestamp", "LedState", "Region0G"], "Missing"
+            )
+
+    def test_npm_explicit_timestamp_column(self):
+        """Test loading with an explicit timestamp_column selection."""
+        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "npm_data.csv"
+            csv_path.write_text(
+                "SystemTimestamp,ComputerTimestamp,LedState,Region0G\n"
+                "1000,1001,1,100.0\n"
+                "1020,1021,1,101.0\n"
+            )
+
+            rec = NpmFiberPhotometryExtractor(
+                csv_path,
+                stream_name="Region0G_led1",
+                color="green",
+                timestamp_column="SystemTimestamp",
+            )
+            assert rec.get_num_samples() == 2
+
+    def test_npm_multiple_timestamp_columns_no_selection(self):
+        """Test error when multiple timestamp columns and none selected."""
+        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "npm_data.csv"
+            csv_path.write_text(
+                "SystemTimestamp,ComputerTimestamp,LedState,Region0G\n"
+                "1000,1001,1,100.0\n"
+                "1020,1021,1,101.0\n"
+            )
+
+            with pytest.raises(ValueError, match="Multiple timestamp columns"):
+                NpmFiberPhotometryExtractor(
+                    csv_path, stream_name="Region0G_led1", color="green"
+                )
+
 
 # =============================================================================
 # NWB Extractor Full Coverage Tests

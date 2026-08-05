@@ -85,6 +85,44 @@ def _find_npm_column(columns: list[str], candidates: list[str]) -> str | None:
     return None
 
 
+def _find_npm_timestamp_columns(columns: list[str]) -> list[str]:
+    """Find all timestamp-like columns (e.g. Timestamp, SystemTimestamp)."""
+    result = []
+    for col in columns:
+        lower = col.lower()
+        if lower.endswith("timestamp") or lower in ("timestamps", "time"):
+            result.append(col)
+    return result
+
+
+def _resolve_npm_timestamp_column(
+    columns: list[str],
+    timestamp_column: str | None,
+) -> str | None:
+    """Resolve which timestamp column to use.
+
+    Returns the column name, or None to fall back to frame-index timestamps.
+    """
+    if timestamp_column is not None:
+        if timestamp_column not in columns:
+            raise ValueError(
+                f"timestamp_column '{timestamp_column}' not found. "
+                f"Available columns: {columns}"
+            )
+        return timestamp_column
+
+    ts_cols = _find_npm_timestamp_columns(columns)
+    if len(ts_cols) == 1:
+        return ts_cols[0]
+    if len(ts_cols) > 1:
+        raise ValueError(
+            f"Multiple timestamp columns found: {ts_cols}. "
+            "Pass timestamp_column= to select one "
+            "(e.g. timestamp_column='SystemTimestamp')."
+        )
+    return _find_npm_column(columns, ["framecounter"])
+
+
 def _timestamps_in_milliseconds(timestamps: np.ndarray) -> bool:
     """Return True if timestamps appear to be in milliseconds.
 
@@ -107,7 +145,7 @@ def _extract_npm_timestamps(
         return np.arange(len(df_filtered))
 
     timestamps = df_filtered[ts_col].to_numpy()
-    if ts_col.lower() == "timestamp":
+    if ts_col.lower().endswith("timestamp"):
         in_ms = timestamp_unit == "ms" or (
             timestamp_unit is None and _timestamps_in_milliseconds(timestamps)
         )
@@ -121,6 +159,7 @@ def _read_npm_data(
     column_name: str,
     led_state: int,
     timestamp_unit: str | None = None,
+    timestamp_column: str | None = None,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """
     Read data for a specific channel and LED state from NPM file.
@@ -133,6 +172,10 @@ def _read_npm_data(
         Name of the data column.
     led_state : int
         LED state to filter by.
+    timestamp_unit : {"s", "ms"}, optional
+        Unit override for the timestamp column.
+    timestamp_column : str, optional
+        Name of the timestamp column to use.
 
     Returns
     -------
@@ -148,9 +191,7 @@ def _read_npm_data(
 
     # Find LED state and timestamp columns
     led_col = _find_npm_column(columns, ["ledstate", "flags", "led"])
-    ts_col = _find_npm_column(columns, ["timestamp", "timestamps", "time"])
-    if ts_col is None:
-        ts_col = _find_npm_column(columns, ["framecounter"])
+    ts_col = _resolve_npm_timestamp_column(columns, timestamp_column)
 
     # Filter by LED state
     if led_col:
@@ -193,9 +234,14 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     color : str
         Color/wavelength identifier (e.g. ``"green"``, ``"415nm"``).
     timestamp_unit : {"s", "ms"}, optional
-        Unit of the ``Timestamp`` column. If None (default), the unit is
+        Unit of the timestamp column. If None (default), the unit is
         inferred from the inter-sample interval. Pass ``"ms"`` or ``"s"``
         to override the heuristic when the file's unit is known.
+    timestamp_column : str, optional
+        Name of the timestamp column to use (e.g. ``"SystemTimestamp"``,
+        ``"ComputerTimestamp"``). If None and exactly one timestamp column
+        is found it is used automatically; if multiple are found a
+        ``ValueError`` is raised listing the options.
 
     Examples
     --------
@@ -224,6 +270,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         stream_name: str | None = None,
         color: str | None = None,
         timestamp_unit: str | None = None,
+        timestamp_column: str | None = None,
     ):
         if timestamp_unit not in (None, "s", "ms"):
             raise ValueError(
@@ -249,7 +296,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
         # Read data
         data, timestamps, sampling_rate = _read_npm_data(
-            file_path, column_name, led_state, timestamp_unit
+            file_path, column_name, led_state, timestamp_unit, timestamp_column
         )
 
         # Ensure data is 2D
@@ -291,6 +338,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
             "stream_name": stream_name,
             "color": color,
             "timestamp_unit": timestamp_unit,
+            "timestamp_column": timestamp_column,
         }
 
         logger.info(
@@ -327,6 +375,7 @@ def read_npm_fiber_photometry(
     stream_name: str | None = None,
     color: str | None = None,
     timestamp_unit: str | None = None,
+    timestamp_column: str | None = None,
 ) -> NpmFiberPhotometryExtractor:
     """
     Read fiber photometry data from an NPM (Neurophotometrics) file.
@@ -342,7 +391,9 @@ def read_npm_fiber_photometry(
     color : str, optional
         Color/wavelength identifier.
     timestamp_unit : {"s", "ms"}, optional
-        Unit of the ``Timestamp`` column. If None, inferred automatically.
+        Unit of the timestamp column. If None, inferred automatically.
+    timestamp_column : str, optional
+        Name of the timestamp column to use. If None, auto-detected.
 
     Returns
     -------
@@ -354,4 +405,5 @@ def read_npm_fiber_photometry(
         stream_name=stream_name,
         color=color,
         timestamp_unit=timestamp_unit,
+        timestamp_column=timestamp_column,
     )
