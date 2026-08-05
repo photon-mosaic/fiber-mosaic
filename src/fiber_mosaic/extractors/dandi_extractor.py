@@ -13,6 +13,10 @@ import numpy as np
 from spikeinterface.core import BaseRecordingSegment
 
 from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
+from fiber_mosaic.extractors.nwb_extractor import (
+    _discover_fiber_photometry_series,
+    _resolve_timing,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -163,37 +167,6 @@ def _stream_nwb(dandiset_id: str, asset_path: str):  # pragma: no cover
     nwbfile = io.read()
 
     return nwbfile, io
-
-
-def _discover_fiber_photometry_series(nwbfile) -> dict:
-    """Discover FiberPhotometryResponseSeries in an NWB file."""
-    series_dict = {}
-    for obj in nwbfile.objects.values():
-        if obj.neurodata_type == "FiberPhotometryResponseSeries":
-            series_dict[obj.name] = obj
-    return series_dict
-
-
-def _resolve_timing(series, n_samples: int) -> tuple[float, np.ndarray]:
-    """Resolve timestamps and sampling rate from an NWB series."""
-    if series.timestamps is not None:
-        timestamps = np.array(series.timestamps[:])
-        if len(timestamps) > 1:
-            dt = timestamps[-1] - timestamps[0]
-            sampling_rate = (len(timestamps) - 1) / dt
-        else:
-            has_rate = hasattr(series, "rate") and series.rate
-            sampling_rate = series.rate if has_rate else 1.0
-    elif hasattr(series, "rate") and series.rate:
-        sampling_rate = float(series.rate)
-        has_t_start = hasattr(series, "starting_time")
-        t_start = series.starting_time if has_t_start else 0.0
-        timestamps = np.arange(n_samples) / sampling_rate + (t_start or 0.0)
-    else:
-        msg = f"Series {series.name} has neither timestamps nor rate"
-        raise ValueError(msg)
-
-    return sampling_rate, timestamps
 
 
 class DandiRecordingSegment(BaseRecordingSegment):

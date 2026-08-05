@@ -50,6 +50,51 @@ def _discover_fiber_photometry_series(nwbfile) -> dict[str, Any]:
     return series_dict
 
 
+def _resolve_timing(series, n_samples: int) -> tuple[float, np.ndarray]:
+    """
+    Resolve timestamps and sampling rate from an NWB series.
+
+    Parameters
+    ----------
+    series : pynwb.TimeSeries
+        NWB time series object with either explicit ``timestamps`` or a
+        ``rate`` attribute.
+    n_samples : int
+        Number of samples in the series; used to synthesise timestamps
+        when only ``rate`` is available.
+
+    Returns
+    -------
+    sampling_rate : float
+        Sampling rate in Hz.
+    timestamps : np.ndarray
+        1-D array of timestamps in seconds.
+
+    Raises
+    ------
+    ValueError
+        If neither ``timestamps`` nor ``rate`` is available on the series.
+    """
+    if series.timestamps is not None:
+        timestamps = np.array(series.timestamps[:])
+        if len(timestamps) > 1:
+            dt = timestamps[-1] - timestamps[0]
+            sampling_rate = (len(timestamps) - 1) / dt
+        else:
+            has_rate = hasattr(series, "rate") and series.rate
+            sampling_rate = series.rate if has_rate else 1.0
+    elif hasattr(series, "rate") and series.rate:
+        sampling_rate = float(series.rate)
+        has_t_start = hasattr(series, "starting_time")
+        t_start = series.starting_time if has_t_start else 0.0
+        timestamps = np.arange(n_samples) / sampling_rate + (t_start or 0.0)
+    else:
+        raise ValueError(
+            f"Series {series.name} has neither timestamps nor rate"
+        )
+    return sampling_rate, timestamps
+
+
 def _resolve_nwb_series(
     series_dict: dict[str, Any],
     series_name: str | None,

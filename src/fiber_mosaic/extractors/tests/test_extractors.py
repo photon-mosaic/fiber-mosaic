@@ -1673,7 +1673,7 @@ class TestDANDIMock:
 
     def test_dandi_resolve_timing_with_timestamps(self):
         """Test DANDI timing resolution with timestamps."""
-        from fiber_mosaic.extractors.dandi_extractor import _resolve_timing
+        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
 
         class MockSeries:
             def __init__(self):
@@ -1686,7 +1686,7 @@ class TestDANDIMock:
 
     def test_dandi_resolve_timing_with_rate(self):
         """Test DANDI timing resolution with rate."""
-        from fiber_mosaic.extractors.dandi_extractor import _resolve_timing
+        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
 
         class MockSeries:
             def __init__(self):
@@ -1700,7 +1700,7 @@ class TestDANDIMock:
 
     def test_dandi_resolve_timing_no_info(self):
         """Test DANDI timing resolution without timing info."""
-        from fiber_mosaic.extractors.dandi_extractor import _resolve_timing
+        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
 
         class MockSeries:
             def __init__(self):
@@ -1714,7 +1714,7 @@ class TestDANDIMock:
 
     def test_dandi_discover_series(self):
         """Test DANDI series discovery."""
-        from fiber_mosaic.extractors.dandi_extractor import (
+        from fiber_mosaic.extractors.nwb_extractor import (
             _discover_fiber_photometry_series,
         )
 
@@ -1952,7 +1952,7 @@ class TestDandiExtractorFullCoverage:
 
     def test_dandi_resolve_timing_single_timestamp_with_rate(self):
         """Test timing resolution with single timestamp and rate."""
-        from fiber_mosaic.extractors.dandi_extractor import _resolve_timing
+        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
 
         class MockSeries:
             def __init__(self):
@@ -1966,7 +1966,7 @@ class TestDandiExtractorFullCoverage:
     def test_dandi_resolve_timing_single_timestamp_no_rate(self):
         """Test timing resolution with single timestamp and no rate
         (defaults to 1.0)."""
-        from fiber_mosaic.extractors.dandi_extractor import _resolve_timing
+        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
 
         class MockSeries:
             def __init__(self):
@@ -1979,7 +1979,7 @@ class TestDandiExtractorFullCoverage:
 
     def test_dandi_resolve_timing_rate_no_starting_time(self):
         """Test timing resolution with rate but no starting_time attribute."""
-        from fiber_mosaic.extractors.dandi_extractor import _resolve_timing
+        from fiber_mosaic.extractors.nwb_extractor import _resolve_timing
 
         class MockSeries:
             def __init__(self):
