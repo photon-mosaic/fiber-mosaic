@@ -35,46 +35,6 @@ def _check_pynwb():
         )
 
 
-def _find_nwb_file(folder_path: str | Path) -> Path:
-    """
-    Find the single NWB file in a folder.
-
-    Parameters
-    ----------
-    folder_path : str or Path
-        Path to folder containing NWB file(s).
-
-    Returns
-    -------
-    Path
-        Path to the NWB file.
-
-    Raises
-    ------
-    FileNotFoundError
-        If no NWB file is found.
-    ValueError
-        If multiple NWB files are found.
-    """
-    folder_path = Path(folder_path)
-
-    # If it's a file, return it directly
-    if folder_path.is_file() and folder_path.suffix == ".nwb":
-        return folder_path
-
-    # Search for NWB files in folder
-    nwb_files = list(folder_path.glob("*.nwb"))
-    if len(nwb_files) == 0:
-        raise FileNotFoundError(f"No NWB file found in {folder_path}")
-    if len(nwb_files) > 1:
-        names = [f.name for f in nwb_files]
-        raise ValueError(
-            f"Multiple NWB files found in {folder_path}: {names}. "
-            "Please specify the exact file path."
-        )
-    return nwb_files[0]
-
-
 def _discover_fiber_photometry_series(nwbfile) -> dict[str, Any]:
     """
     Discover all FiberPhotometryResponseSeries in an NWB file.
@@ -91,6 +51,25 @@ def _discover_fiber_photometry_series(nwbfile) -> dict[str, Any]:
     return series_dict
 
 
+def _resolve_nwb_series(
+    series_dict: dict[str, Any],
+    series_name: str | None,
+) -> str:
+    """Resolve a series name, auto-selecting when only one series exists."""
+    if series_name is None:
+        if len(series_dict) == 1:
+            return list(series_dict.keys())[0]
+        raise ValueError(
+            f"Multiple series found: {list(series_dict.keys())}. "
+            "Please specify series_name."
+        )
+    if series_name not in series_dict:
+        raise ValueError(
+            f"Series '{series_name}' not found. "
+            f"Available: {list(series_dict.keys())}"
+        )
+    return series_name
+
 
 class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     """
@@ -102,12 +81,14 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     Parameters
     ----------
     file_path : str or Path
-        Path to the NWB file or folder containing a single NWB file.
+        Path to the NWB file.
     series_name : str, optional
         Name of the FiberPhotometryResponseSeries to read. If None and only
         one series exists, it will be used automatically.
-    color : str, optional
-        Color/wavelength identifier. If None, uses the series name.
+    color : str
+        Color/wavelength identifier (e.g. ``"green"``, ``"415nm"``).
+        Must be provided explicitly; NWB series names encode the
+        experimental signal, not illumination color.
 
     Examples
     --------
@@ -130,7 +111,9 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     ):
         _check_pynwb()
 
-        nwb_path = _find_nwb_file(file_path)
+        nwb_path = Path(file_path)
+        if not nwb_path.exists():
+            raise FileNotFoundError(f"File not found: {nwb_path}")
 
         with NWBHDF5IO(str(nwb_path), "r") as io:
             nwbfile = io.read()
@@ -143,22 +126,7 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
                     f"No FiberPhotometryResponseSeries found in {nwb_path}"
                 )
 
-            # Select series
-            if series_name is None:
-                if len(series_dict) == 1:
-                    series_name = list(series_dict.keys())[0]
-                else:
-                    raise ValueError(
-                        f"Multiple series found: {list(series_dict.keys())}. "
-                        "Please specify series_name."
-                    )
-
-            if series_name not in series_dict:
-                raise ValueError(
-                    f"Series '{series_name}' not found. "
-                    f"Available: {list(series_dict.keys())}"
-                )
-
+            series_name = _resolve_nwb_series(series_dict, series_name)
             series = series_dict[series_name]
 
             # Read data
@@ -191,9 +159,12 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
             else:
                 sampling_rate = 1.0
 
-            # Use series name as color if not provided
-            if color is None:
-                color = series_name
+        if color is None:
+            raise ValueError(
+                "color must be provided explicitly (e.g. color='green'). "
+                "NWB series names encode the experimental signal "
+                "(e.g. 'GCaMP_signal'), not illumination color."
+            )
 
         # Initialize base class
         super().__init__(
@@ -231,14 +202,14 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
 
     @classmethod
-    def get_streams(cls, file_path: str) -> tuple[list[str], list[str]]:
+    def get_streams(cls, file_path: str | Path) -> tuple[list[str], list[str]]:
         """
         Discover available FiberPhotometryResponseSeries in an NWB file.
 
         Parameters
         ----------
-        file_path : str
-            Path to the NWB file or folder.
+        file_path : str or Path
+            Path to the NWB file.
 
         Returns
         -------
@@ -249,7 +220,7 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         """
         _check_pynwb()
 
-        nwb_path = _find_nwb_file(file_path)
+        nwb_path = Path(file_path)
 
         with NWBHDF5IO(str(nwb_path), "r") as io:
             nwbfile = io.read()

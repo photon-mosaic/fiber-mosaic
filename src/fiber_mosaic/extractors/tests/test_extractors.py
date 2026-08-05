@@ -1247,47 +1247,6 @@ class TestNwbExtractor:
         with pytest.raises(ImportError, match="pynwb is required"):
             _check_pynwb()
 
-    def test_nwb_find_file_not_found(self):
-        """Test error when no NWB file found."""
-        from fiber_mosaic.extractors.nwb_extractor import _find_nwb_file
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with pytest.raises(FileNotFoundError, match="No NWB file"):
-                _find_nwb_file(tmpdir)
-
-    def test_nwb_find_multiple_files(self):
-        """Test error when multiple NWB files found."""
-        from fiber_mosaic.extractors.nwb_extractor import _find_nwb_file
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            (Path(tmpdir) / "file1.nwb").touch()
-            (Path(tmpdir) / "file2.nwb").touch()
-
-            with pytest.raises(ValueError, match="Multiple NWB files"):
-                _find_nwb_file(tmpdir)
-
-    def test_nwb_find_single_file(self):
-        """Test finding single NWB file."""
-        from fiber_mosaic.extractors.nwb_extractor import _find_nwb_file
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            nwb_path = Path(tmpdir) / "session.nwb"
-            nwb_path.touch()
-
-            found = _find_nwb_file(tmpdir)
-            assert found == nwb_path
-
-    def test_nwb_find_direct_file(self):
-        """Test finding NWB file when given directly."""
-        from fiber_mosaic.extractors.nwb_extractor import _find_nwb_file
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            nwb_path = Path(tmpdir) / "session.nwb"
-            nwb_path.touch()
-
-            found = _find_nwb_file(nwb_path)
-            assert found == nwb_path
-
 
 # =============================================================================
 # TDT Extractor Tests
@@ -2598,8 +2557,134 @@ class TestNwbExtractorFullCoverage:
                     "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
                     return_value=mock_io,
                 ):
-                    rec = read_nwb_fiber_photometry(str(nwb_path))
+                    rec = read_nwb_fiber_photometry(
+                        str(nwb_path), color="green"
+                    )
                     assert rec.get_num_fibers() == 1
+
+    def test_nwb_file_not_found(self):
+        """Test FileNotFoundError when file does not exist."""
+        from fiber_mosaic.extractors import NwbFiberPhotometryExtractor
+
+        with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
+            with pytest.raises(FileNotFoundError, match="File not found"):
+                NwbFiberPhotometryExtractor("/nonexistent/path/session.nwb")
+
+    def test_nwb_extractor_no_color(self):
+        """Test error when color is not provided."""
+        from fiber_mosaic.extractors import NwbFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            nwb_path = Path(tmpdir) / "session.nwb"
+            nwb_path.touch()
+
+            mock_data = np.random.randn(100)
+            mock_timestamps = np.linspace(0, 10, 100)
+
+            mock_series = MagicMock()
+            mock_series.name = "FPSeries"
+            mock_series.neurodata_type = "FiberPhotometryResponseSeries"
+            mock_series.data = MagicMock()
+            mock_series.data.__getitem__ = lambda self, x: mock_data
+            mock_series.data.shape = mock_data.shape
+            mock_series.get_timestamps.return_value = mock_timestamps
+            mock_series.rate = None
+
+            mock_nwbfile = MagicMock()
+            mock_nwbfile.objects.values.return_value = [mock_series]
+
+            mock_io = MagicMock()
+            mock_io.read.return_value = mock_nwbfile
+            mock_io.__enter__ = MagicMock(return_value=mock_io)
+            mock_io.__exit__ = MagicMock(return_value=False)
+
+            with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
+                with patch(
+                    "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+                    return_value=mock_io,
+                ):
+                    with pytest.raises(
+                        ValueError, match="color must be provided"
+                    ):
+                        NwbFiberPhotometryExtractor(
+                            str(nwb_path), series_name="FPSeries"
+                        )
+
+    def test_nwb_extractor_with_rate(self):
+        """Test that series.rate is used as sampling_rate when set."""
+        from fiber_mosaic.extractors import NwbFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            nwb_path = Path(tmpdir) / "session.nwb"
+            nwb_path.touch()
+
+            mock_data = np.random.randn(100)
+            mock_timestamps = np.linspace(0, 10, 100)
+
+            mock_series = MagicMock()
+            mock_series.name = "FPSeries"
+            mock_series.neurodata_type = "FiberPhotometryResponseSeries"
+            mock_series.data = MagicMock()
+            mock_series.data.__getitem__ = lambda self, x: mock_data
+            mock_series.data.shape = mock_data.shape
+            mock_series.get_timestamps.return_value = mock_timestamps
+            mock_series.rate = 20.0
+
+            mock_nwbfile = MagicMock()
+            mock_nwbfile.objects.values.return_value = [mock_series]
+
+            mock_io = MagicMock()
+            mock_io.read.return_value = mock_nwbfile
+            mock_io.__enter__ = MagicMock(return_value=mock_io)
+            mock_io.__exit__ = MagicMock(return_value=False)
+
+            with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
+                with patch(
+                    "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+                    return_value=mock_io,
+                ):
+                    rec = NwbFiberPhotometryExtractor(
+                        str(nwb_path), series_name="FPSeries", color="green"
+                    )
+                    assert rec.get_sampling_frequency() == 20.0
+
+    def test_nwb_extractor_single_sample_no_rate(self):
+        """Test sampling_rate fallback to 1.0 for single-sample series."""
+        from fiber_mosaic.extractors import NwbFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            nwb_path = Path(tmpdir) / "session.nwb"
+            nwb_path.touch()
+
+            mock_data = np.random.randn(1)
+            mock_timestamps = np.array([0.0])
+
+            mock_series = MagicMock()
+            mock_series.name = "FPSeries"
+            mock_series.neurodata_type = "FiberPhotometryResponseSeries"
+            mock_series.data = MagicMock()
+            mock_series.data.__getitem__ = lambda self, x: mock_data
+            mock_series.data.shape = mock_data.shape
+            mock_series.get_timestamps.return_value = mock_timestamps
+            mock_series.rate = None
+
+            mock_nwbfile = MagicMock()
+            mock_nwbfile.objects.values.return_value = [mock_series]
+
+            mock_io = MagicMock()
+            mock_io.read.return_value = mock_nwbfile
+            mock_io.__enter__ = MagicMock(return_value=mock_io)
+            mock_io.__exit__ = MagicMock(return_value=False)
+
+            with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
+                with patch(
+                    "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+                    return_value=mock_io,
+                ):
+                    rec = NwbFiberPhotometryExtractor(
+                        str(nwb_path), series_name="FPSeries", color="green"
+                    )
+                    assert rec.get_sampling_frequency() == 1.0
 
 
 # =============================================================================
