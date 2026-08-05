@@ -253,13 +253,14 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         n_samples = n_chunks * npoints
         data = raw_data.reshape(n_samples, 1)
 
-        # Build continuous timestamp array
+        # Build continuous timestamp array relative to session start
         # Each chunk has npoints samples at the given sampling rate
+        t0 = timestamps[0]
         full_timestamps = np.zeros(n_samples)
         for i, ts in enumerate(timestamps):
             start_idx = i * npoints
             end_idx = start_idx + npoints
-            chunk_times = ts + np.arange(npoints) / sampling_rate
+            chunk_times = (ts - t0) + np.arange(npoints) / sampling_rate
             full_timestamps[start_idx:end_idx] = chunk_times
 
         # Create fiber IDs
