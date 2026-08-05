@@ -13,7 +13,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from numpy import float32, float64, int32, int64, uint16
-from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
 
@@ -283,16 +282,7 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
             dtype=data.dtype,
         )
 
-        # Add segment
-        segment = NumpyRecordingSegment(
-            traces=data.astype(np.float64),
-            sampling_frequency=sampling_rate,
-            t_start=full_timestamps[0] if len(full_timestamps) > 0 else 0.0,
-        )
-        self.add_segment(segment)
-
-        # Store timestamps
-        self.set_times(full_timestamps)
+        self._add_numpy_segment(data, full_timestamps)
 
         # Store kwargs
         self._kwargs = {

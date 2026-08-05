@@ -14,6 +14,7 @@ from collections.abc import Iterable, Sequence
 import numpy as np
 from numpy.typing import ArrayLike
 from spikeinterface.core import BaseRecording
+from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 
 class BaseFiberPhotometryExtractor(BaseRecording):
@@ -297,6 +298,35 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         raise NotImplementedError(
             f"{cls.__name__}.get_streams() must be implemented by file readers"
         )
+
+    def _add_numpy_segment(
+        self,
+        traces: np.ndarray,
+        timestamps: np.ndarray,
+    ) -> None:
+        """
+        Add an in-memory segment and set per-fiber timestamps.
+
+        Convenience method used by all file-format extractors that load
+        data into NumPy arrays. Calls :meth:`add_segment` and
+        :meth:`set_times` so subclasses do not repeat the boilerplate.
+
+        Parameters
+        ----------
+        traces : np.ndarray
+            2-D array of shape ``(n_samples, n_fibers)``. Cast to float64
+            before storing.
+        timestamps : np.ndarray
+            1-D array of timestamps in seconds, length ``n_samples``.
+        """
+        t_start = float(timestamps[0]) if len(timestamps) > 0 else 0.0
+        segment = NumpyRecordingSegment(
+            traces=traces.astype(np.float64),
+            sampling_frequency=self.get_sampling_frequency(),
+            t_start=t_start,
+        )
+        self.add_segment(segment)
+        self.set_times(timestamps)
 
     def add_segment(self, segment) -> None:
         """

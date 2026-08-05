@@ -12,7 +12,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
 
@@ -179,16 +178,7 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
             dtype=traces.dtype,
         )
 
-        # Add segment with data
-        segment = NumpyRecordingSegment(
-            traces=traces,
-            sampling_frequency=sampling_frequency,
-            t_start=times[0] if len(times) > 0 else 0.0,
-        )
-        self.add_segment(segment)
-
-        # Store actual timestamps
-        self.set_times(times)
+        self._add_numpy_segment(traces, times)
 
         # Store kwargs for serialization
         self._kwargs = {

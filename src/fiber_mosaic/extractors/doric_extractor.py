@@ -11,7 +11,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
 
@@ -419,16 +418,7 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
             dtype=data.dtype,
         )
 
-        # Add segment
-        segment = NumpyRecordingSegment(
-            traces=data.astype(np.float64),
-            sampling_frequency=sampling_rate,
-            t_start=timestamps[0] if len(timestamps) > 0 else 0.0,
-        )
-        self.add_segment(segment)
-
-        # Store timestamps
-        self.set_times(timestamps)
+        self._add_numpy_segment(data, timestamps)
 
         # Store kwargs
         self._kwargs = {
