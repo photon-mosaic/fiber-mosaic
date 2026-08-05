@@ -81,10 +81,10 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         Path to the CSV file.
     color : str
         Color/wavelength identifier for this recording (e.g., "green", "iso").
-    time_column : str, optional
-        Name of the timestamp column. Default is "time". Matched exactly; if
-        your file names it anything else, pass that name here. The column is
-        required (timestamps synchronize signals with behavior events).
+    time_column : str
+        Name of the timestamp column. Matched exactly against the CSV
+        headers (e.g. ``"time"``, ``"timestamps"``, ``"Time(s)"``).
+        Required; timestamps synchronize signals with behavior events.
     fiber_columns : list of str, optional
         Explicit names of the fluorescence (fiber) data columns to read.
         Authoritative when given; every name must exist in the file.
@@ -108,7 +108,9 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
     Examples
     --------
-    >>> recording = CsvFiberPhotometryExtractor("data.csv", color="green")
+    >>> recording = CsvFiberPhotometryExtractor(
+    ...     "data.csv", color="green", time_column="time"
+    ... )
     >>> recording.get_fluorescence()
     >>> # AIND FIP file: select only the fiber channels
     >>> fip = CsvFiberPhotometryExtractor(
@@ -121,7 +123,7 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         self,
         file_path: str | Path,
         color: str,
-        time_column: str = "time",
+        time_column: str,
         fiber_columns: list[str] | None = None,
         fiber_pattern: str | None = None,
         sampling_frequency: float | None = None,
@@ -134,14 +136,10 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         df = pd.read_csv(file_path, index_col=False)
         columns = list(df.columns)
 
-        # The time column is required (recordings are synchronized against
-        # behavior events) and matched exactly: the default is "time"; name
-        # any other column explicitly via time_column. No fuzzy fallback.
         if time_column not in columns:
             raise ValueError(
-                f"Time column {time_column!r} not found. Timestamps are "
-                f"required to synchronize signals with behavior events; pass "
-                f"time_column= to name it. Available columns: {columns}"
+                f"Time column {time_column!r} not found. "
+                f"Available columns: {columns}"
             )
         time_col = time_column
 
@@ -213,7 +211,7 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     def get_streams(
         cls,
         file_path: str,
-        time_column: str = "time",
+        time_column: str | None = None,
         fiber_pattern: str | None = None,
         **kwargs,
     ) -> tuple[list[str], list[str]]:
@@ -225,9 +223,9 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         file_path : str
             Path to the CSV file.
         time_column : str, optional
-            Name of the timestamp column to exclude from the reported
-            streams. Default is "time"; pass the same value you would give
-            the constructor so discovery matches what will be loaded.
+            Name of the timestamp column to exclude from reported streams.
+            Pass the same name you will give the constructor. If None
+            (default), all columns are returned including the time column.
         fiber_pattern : str, optional
             Glob pattern (e.g. "Fiber_*") to positively select data columns,
             matching the constructor. If given, only matching columns are
@@ -262,7 +260,7 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 def read_csv_fiber_photometry(
     file_path: str | Path,
     color: str,
-    time_column: str = "time",
+    time_column: str,
     fiber_columns: list[str] | None = None,
     fiber_pattern: str | None = None,
     sampling_frequency: float | None = None,
@@ -278,8 +276,8 @@ def read_csv_fiber_photometry(
         Path to the CSV file.
     color : str
         Color/wavelength identifier for this recording.
-    time_column : str, optional
-        Name of the timestamp column. Default is "time".
+    time_column : str
+        Name of the timestamp column.
     fiber_columns : list of str, optional
         Explicit names of the fiber data columns to read.
     fiber_pattern : str, optional
@@ -295,7 +293,9 @@ def read_csv_fiber_photometry(
 
     Examples
     --------
-    >>> rec = read_csv_fiber_photometry("green_channel.csv", color="green")
+    >>> rec = read_csv_fiber_photometry(
+    ...     "green_channel.csv", color="green", time_column="time"
+    ... )
     >>> rec.get_fluorescence()
     """
     return CsvFiberPhotometryExtractor(

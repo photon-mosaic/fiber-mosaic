@@ -34,7 +34,9 @@ class TestCsvExtractor:
 
         try:
             # Load with extractor
-            rec = CsvFiberPhotometryExtractor(csv_path, color="green")
+            rec = CsvFiberPhotometryExtractor(
+                csv_path, color="green", time_column="time"
+            )
 
             # Verify basic properties
             assert rec.get_num_fibers() == 2
@@ -65,7 +67,9 @@ class TestCsvExtractor:
             csv_path = f.name
 
         try:
-            names, ids = CsvFiberPhotometryExtractor.get_streams(csv_path)
+            names, ids = CsvFiberPhotometryExtractor.get_streams(
+                csv_path, time_column="time"
+            )
             assert "signal" in names
             assert "control" in names
         finally:
@@ -140,7 +144,10 @@ class TestCsvExtractor:
         try:
             with pytest.raises(ValueError, match="matched no columns"):
                 CsvFiberPhotometryExtractor(
-                    csv_path, color="green", fiber_pattern="Fiber_*"
+                    csv_path,
+                    color="green",
+                    time_column="time",
+                    fiber_pattern="Fiber_*",
                 )
         finally:
             Path(csv_path).unlink()
@@ -171,10 +178,12 @@ class TestCsvExtractor:
         from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
 
         with pytest.raises(FileNotFoundError, match="not found"):
-            CsvFiberPhotometryExtractor("/nonexistent/file.csv", color="green")
+            CsvFiberPhotometryExtractor(
+                "/nonexistent/file.csv", color="green", time_column="time"
+            )
 
     def test_csv_extractor_no_time_column(self):
-        """Test error when time column is not found."""
+        """Test error when the specified time column is not found."""
         from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
 
         with tempfile.NamedTemporaryFile(
@@ -188,7 +197,9 @@ class TestCsvExtractor:
             with pytest.raises(
                 ValueError, match="Time column 'time' not found"
             ):
-                CsvFiberPhotometryExtractor(csv_path, color="green")
+                CsvFiberPhotometryExtractor(
+                    csv_path, color="green", time_column="time"
+                )
         finally:
             Path(csv_path).unlink()
 
@@ -205,7 +216,9 @@ class TestCsvExtractor:
 
         try:
             with pytest.raises(ValueError, match="No fiber columns found"):
-                CsvFiberPhotometryExtractor(csv_path, color="green")
+                CsvFiberPhotometryExtractor(
+                    csv_path, color="green", time_column="time"
+                )
         finally:
             Path(csv_path).unlink()
 
@@ -223,7 +236,10 @@ class TestCsvExtractor:
         try:
             with pytest.raises(ValueError, match="not found in CSV"):
                 CsvFiberPhotometryExtractor(
-                    csv_path, color="green", fiber_columns=["nonexistent"]
+                    csv_path,
+                    color="green",
+                    time_column="time",
+                    fiber_columns=["nonexistent"],
                 )
         finally:
             Path(csv_path).unlink()
@@ -241,7 +257,9 @@ class TestCsvExtractor:
 
         try:
             with pytest.raises(ValueError, match="Cannot compute"):
-                CsvFiberPhotometryExtractor(csv_path, color="green")
+                CsvFiberPhotometryExtractor(
+                    csv_path, color="green", time_column="time"
+                )
         finally:
             Path(csv_path).unlink()
 
@@ -258,14 +276,17 @@ class TestCsvExtractor:
 
         try:
             rec = CsvFiberPhotometryExtractor(
-                csv_path, color="green", sampling_frequency=100.0
+                csv_path,
+                color="green",
+                time_column="time",
+                sampling_frequency=100.0,
             )
             assert rec.get_sampling_frequency() == 100.0
         finally:
             Path(csv_path).unlink()
 
     def test_csv_extractor_alternate_time_columns(self):
-        """A non-default time column must be named explicitly."""
+        """The time column must be named explicitly to match the file."""
         from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
 
         with tempfile.NamedTemporaryFile(
@@ -277,13 +298,15 @@ class TestCsvExtractor:
             csv_path = f.name
 
         try:
-            # Not auto-discovered: the default "time" is matched exactly.
+            # Wrong column name raises a clear error.
             with pytest.raises(
                 ValueError, match="Time column 'time' not found"
             ):
-                CsvFiberPhotometryExtractor(csv_path, color="green")
+                CsvFiberPhotometryExtractor(
+                    csv_path, color="green", time_column="time"
+                )
 
-            # Naming it explicitly works.
+            # Correct column name works.
             rec = CsvFiberPhotometryExtractor(
                 csv_path, color="green", time_column="timestamps"
             )
@@ -306,7 +329,9 @@ class TestCsvExtractor:
             csv_path = f.name
 
         try:
-            rec = read_csv_fiber_photometry(csv_path, color="green")
+            rec = read_csv_fiber_photometry(
+                csv_path, color="green", time_column="time"
+            )
             assert rec.get_num_samples() == 2
         finally:
             Path(csv_path).unlink()
@@ -1367,19 +1392,13 @@ class TestAdditionalCoverage:
     """Additional tests to increase coverage."""
 
     def test_csv_time_column_variations(self):
-        """Any non-default time column name works when passed explicitly."""
+        """Any time column name works when passed explicitly."""
         from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
 
-        for time_col in ["Time", "Timestamps", "Time(s)"]:
+        for time_col in ["time", "Time", "Timestamps", "Time(s)"]:
             with tempfile.TemporaryDirectory() as tmpdir:
                 csv_path = Path(tmpdir) / "data.csv"
                 csv_path.write_text(f"{time_col},data\n0.0,1.0\n0.1,2.0\n")
-
-                # Not auto-discovered under the default.
-                with pytest.raises(
-                    ValueError, match="Time column 'time' not found"
-                ):
-                    CsvFiberPhotometryExtractor(csv_path, color="green")
 
                 rec = CsvFiberPhotometryExtractor(
                     csv_path, color="green", time_column=time_col
@@ -1397,7 +1416,10 @@ class TestAdditionalCoverage:
             )
 
             rec = CsvFiberPhotometryExtractor(
-                csv_path, color="green", fiber_columns=["fiber1", "fiber2"]
+                csv_path,
+                color="green",
+                time_column="time",
+                fiber_columns=["fiber1", "fiber2"],
             )
             assert rec.get_num_fibers() == 2
 
