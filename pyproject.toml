@@ -24,6 +24,7 @@ dependencies = [
 dev = [
     'coverage',
     'furo',
+    'matplotlib',
     'pytest',
     'pytest-cov',
     'ruff==0.15.12',
