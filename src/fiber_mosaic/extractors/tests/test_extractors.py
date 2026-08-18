@@ -1256,6 +1256,94 @@ class TestNpmExtractor:
             assert rec.get_num_samples() == 2
 
 
+class TestNpmHeaderlessFiles:
+    """Legacy NPM exports that omit the header row entirely."""
+
+    def test_headerless_streams_named_by_position(self):
+        """Data values are not consumed as column names."""
+        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "npm.csv"
+            csv_path.write_text(
+                "1000.0,6558.5,4429.4\n"
+                "1025.0,4822.6,3898.8\n"
+                "1050.0,6568.5,4429.8\n"
+            )
+
+            names, ids = NpmFiberPhotometryExtractor.get_streams(csv_path)
+            assert names == ["Region0G_led0", "Region1G_led0"]
+            assert ids == names
+
+    def test_headerless_keeps_first_row_of_data(self):
+        """The first sample survives and the timebase is used."""
+        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "npm.csv"
+            csv_path.write_text(
+                "1000.0,6558.5\n1025.0,4822.6\n1050.0,6568.5\n"
+            )
+
+            rec = NpmFiberPhotometryExtractor(
+                csv_path, stream_name="Region0G_led0", color="green"
+            )
+            assert rec.get_num_samples() == 3
+            traces = rec.get_fluorescence().ravel()
+            assert traces[0] == pytest.approx(6558.5)
+            # Millisecond timebase is converted to seconds.
+            times = rec.get_fiber_times().ravel()
+            assert times[0] == pytest.approx(1.0)
+            assert rec.get_sampling_frequency() == pytest.approx(40.0)
+
+    def test_headerless_without_timebase_column(self):
+        """A non-increasing first column is treated as data, not time."""
+        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "npm.csv"
+            csv_path.write_text("100.0,200.0\n99.0,201.0\n101.0,202.0\n")
+
+            names, _ = NpmFiberPhotometryExtractor.get_streams(csv_path)
+            assert names == ["Region0G_led0", "Region1G_led0"]
+
+            rec = NpmFiberPhotometryExtractor(
+                csv_path, stream_name="Region0G_led0", color="green"
+            )
+            # Falls back to frame-index timestamps.
+            assert rec.get_fiber_times().ravel().tolist() == [0.0, 1.0, 2.0]
+
+    def test_headerless_single_column(self):
+        """A one-column file has no timebase to detect."""
+        from fiber_mosaic.extractors.npm_extractor import (
+            _synthesize_npm_columns,
+        )
+
+        df = pd.DataFrame({0: [1.0, 2.0, 3.0]})
+        assert _synthesize_npm_columns(df) == ["Region0G"]
+
+    def test_headered_file_is_unchanged(self):
+        """A real header row is still honoured."""
+        from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            csv_path = Path(tmpdir) / "npm.csv"
+            csv_path.write_text(
+                "Timestamp,LedState,Region0G\n1000.0,2,100.0\n1025.0,2,101.0\n"
+            )
+
+            names, _ = NpmFiberPhotometryExtractor.get_streams(csv_path)
+            assert names == ["Region0G_led2"]
+
+    def test_empty_row_is_not_numeric(self):
+        """An empty row does not count as a numeric data row."""
+        from fiber_mosaic.extractors.npm_extractor import _is_numeric_row
+
+        assert _is_numeric_row([]) is False
+        assert _is_numeric_row(["1.0", "2.0"]) is True
+        assert _is_numeric_row(["Timestamp", "1.0"]) is False
+
+
 # =============================================================================
 # NWB Extractor Tests
 # =============================================================================

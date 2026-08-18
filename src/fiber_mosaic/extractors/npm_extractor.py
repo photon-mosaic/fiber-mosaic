@@ -6,6 +6,7 @@ Reads Neurophotometrics multi-channel CSV files with interleaved LED states.
 
 from __future__ import annotations
 
+import csv
 import logging
 from pathlib import Path
 
@@ -17,13 +18,63 @@ from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
 logger = logging.getLogger(__name__)
 
 
+def _is_numeric_row(fields: list[str]) -> bool:
+    """Return True if every field in a CSV row parses as a float."""
+    if not fields:
+        return False
+    for field in fields:
+        try:
+            float(field)
+        except ValueError:
+            return False
+    return True
+
+
+def _synthesize_npm_columns(df: pd.DataFrame) -> list[str]:
+    """
+    Build column names for a headerless NPM file.
+
+    The first column is named ``Timestamp`` when it increases strictly
+    (the legacy layout writes the timebase first); the remaining columns
+    become ``Region0G``, ``Region1G``, ... in file order.
+    """
+    n_columns = df.shape[1]
+    first = df.iloc[:, 0].to_numpy()
+    has_timestamp = n_columns > 1 and bool(np.all(np.diff(first) > 0))
+
+    names = ["Timestamp"] if has_timestamp else []
+    names.extend(f"Region{i}G" for i in range(n_columns - len(names)))
+    return names
+
+
+def _read_npm_csv(file_path: Path) -> pd.DataFrame:
+    """
+    Read an NPM CSV, synthesizing column names when it has no header.
+
+    Legacy Neurophotometrics exports omit the header row entirely, so
+    ``pd.read_csv`` would otherwise consume the first sample as column
+    names. A file is treated as headerless when every field of its first
+    line parses as a number.
+    """
+    with file_path.open("r", newline="") as handle:
+        first_line = handle.readline()
+    fields = next(csv.reader([first_line]), [])
+
+    if not _is_numeric_row(fields):
+        return pd.read_csv(file_path, index_col=False)
+
+    df = pd.read_csv(file_path, header=None, index_col=False)
+    df.columns = _synthesize_npm_columns(df)
+    return df
+
+
 def _discover_npm_streams(file_path: Path) -> tuple[list[str], dict[str, int]]:
     """
     Discover available channels and LED states in NPM file.
 
     Returns stream names and mapping to LED states.
     """
-    df = pd.read_csv(file_path, index_col=False)
+    df = _read_npm_csv(file_path)
     columns = list(df.columns)
 
     # Find LED state column
@@ -185,7 +236,7 @@ def _read_npm_data(
     sampling_rate : float
         Sampling rate in Hz.
     """
-    df = pd.read_csv(file_path, index_col=False)
+    df = _read_npm_csv(file_path)
     columns = list(df.columns)
 
     # Find LED state and timestamp columns
