@@ -2,19 +2,11 @@
 
 The counterpart to :mod:`spikeinterface.preprocessing`, sitting beside
 :mod:`fiber_mosaic.core` (the recording layer). Importing this package
-registers the built-in steps defined in :mod:`.steps`.
+registers the built-in steps defined in :mod:`.functions`.
 """
 
-from fiber_mosaic.processing.helpers import map_segments, recording_like
-from fiber_mosaic.processing.pipeline import apply_pipeline, validate_pipeline
-from fiber_mosaic.processing.registry import (
-    get_step,
-    pipeline_step,
-    register_step,
-    registered_steps,
-)
-from fiber_mosaic.processing.steps import (
-    apply_to_group,
+from fiber_mosaic.processing.functions import (
+    apply_correction,
     bandpass_filter,
     bleach_correction,
     center,
@@ -29,28 +21,41 @@ from fiber_mosaic.processing.steps import (
     scale,
     zscore,
 )
+from fiber_mosaic.processing.pipeline import apply_pipeline, validate_pipeline
+from fiber_mosaic.processing.registry import (
+    ArrayStep,
+    RecordingStep,
+    concatenate_segments,
+    get_step,
+    processing_step,
+    register_step,
+    registered_steps,
+    validate_timeline,
+)
 
 __all__ = [
+    "ArrayStep",
+    "RecordingStep",
+    "apply_correction",
     "apply_pipeline",
-    "apply_to_group",
     "bandpass_filter",
     "bleach_correction",
     "center",
     "common_reference",
+    "concatenate_segments",
     "decimate",
     "gaussian_filter",
     "get_step",
     "highpass_filter",
     "isosbestic_correction",
-    "map_segments",
     "normalize_by_quantile",
     "notch_filter",
-    "pipeline_step",
-    "recording_like",
+    "processing_step",
     "register_step",
     "registered_steps",
     "resample",
     "scale",
     "validate_pipeline",
+    "validate_timeline",
     "zscore",
 ]

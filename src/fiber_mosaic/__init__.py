@@ -8,14 +8,14 @@ from .core.base import (
 )
 from .processing import (
     apply_pipeline,
-    apply_to_group,
     bleach_correction,
+    concatenate_segments,
     isosbestic_correction,
-    map_segments,
-    pipeline_step,
-    recording_like,
+    processing_step,
     register_step,
     registered_steps,
+    validate_pipeline,
+    validate_timeline,
 )
 
 try:
@@ -27,12 +27,12 @@ __all__ = [
     "BaseFiberPhotometryExtractor",
     "FiberPhotometryRecordingGroup",
     "apply_pipeline",
-    "apply_to_group",
     "bleach_correction",
+    "concatenate_segments",
     "isosbestic_correction",
-    "map_segments",
-    "pipeline_step",
-    "recording_like",
+    "processing_step",
     "register_step",
     "registered_steps",
+    "validate_pipeline",
+    "validate_timeline",
 ]

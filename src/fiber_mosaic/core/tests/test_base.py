@@ -315,3 +315,12 @@ def test_group_repr(group):
     assert "3 fiber(s)" in r
     assert "[green]" in r
     assert "[red]" in r
+
+
+def test_with_recording_returns_a_new_group(group):
+    grp, green, *_ = group
+    extended = grp.with_recording("copy", green)
+    assert "copy" in extended
+    assert extended["copy"] is green
+    # the original is untouched
+    assert "copy" not in grp
