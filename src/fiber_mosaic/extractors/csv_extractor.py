@@ -71,7 +71,7 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
     Reads CSV files containing timestamps and fluorescence data. The CSV
     should have:
-    - A time column (default name "time"; pass time_column for others)
+    - A time column, named explicitly via ``time_column`` (no default)
     - One or more data columns (fiber channels)
 
     Parameters
