@@ -1,0 +1,39 @@
+name: Publish to PyPI
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    name: Build and publish to PyPI
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for PyPI trusted publishing (harmless if a token is used).
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history + tags so pdm's scm versioning resolves the tag.
+          fetch-depth: 0
+      - uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.12'
+      - name: Build
+        run: pdm build
+
+      # ------------------------------------------------------------------
+      # PyPI authentication is not decided yet. Enable exactly one option
+      # below, then remove this note.
+      #
+      # Option A — Trusted publishing (OIDC, no secret). Requires a trusted
+      # publisher configured on PyPI for this repo + workflow. Recommended.
+      #   - name: Publish
+      #     run: pdm publish --no-build
+      #
+      # Option B — API token stored as a repository/organization secret.
+      #   - name: Publish
+      #     env:
+      #       PDM_PUBLISH_USERNAME: __token__
+      #       PDM_PUBLISH_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      #     run: pdm publish --no-build
+      # ------------------------------------------------------------------
