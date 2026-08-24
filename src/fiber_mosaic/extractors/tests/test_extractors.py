@@ -695,8 +695,9 @@ class TestFiberPhotometryRecordingGroup:
         repr_str = repr(group)
 
         assert "FiberPhotometryRecordingGroup" in repr_str
-        assert "1 colors" in repr_str
-        assert "2 fibers" in repr_str
+        assert "1 color(s)" in repr_str
+        assert "2 fiber(s)" in repr_str
+        assert "[green]" in repr_str
 
 
 # =============================================================================

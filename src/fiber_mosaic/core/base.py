@@ -343,6 +343,18 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         self._recording_segments.append(segment)
         segment.set_parent_extractor(self)
 
+    def __repr__(self) -> str:
+        """Return a one-line summary: class, color, fiber/segment count."""
+        n_seg = self.get_num_segments()
+        n_fib = self.get_num_fibers()
+        sf = self.get_sampling_frequency()
+        dtype = self.get_dtype()
+        return (
+            f"{self.__class__.__name__} | color={self.color} | "
+            f"{n_fib} fiber(s) | {n_seg} segment(s) | "
+            f"{sf:.1f} Hz | dtype: {dtype}"
+        )
+
 
 class FiberPhotometryRecordingGroup:
     """
@@ -456,12 +468,11 @@ class FiberPhotometryRecordingGroup:
         return self._recordings.items()
 
     def __repr__(self) -> str:
-        """Return a string representation of this group."""
-        n_colors = len(self._recordings)
-        n_fibers = self.get_num_fibers()
-        colors = ", ".join(self.colors)
-        return (
-            f"FiberPhotometryRecordingGroup: "
-            f"{n_colors} colors ({colors}) - "
-            f"{n_fibers} fibers"
-        )
+        """Return a multi-line summary listing each per-color recording."""
+        lines = [
+            f"{self.__class__.__name__} | "
+            f"{self.get_num_fibers()} fiber(s), {len(self)} color(s)"
+        ]
+        for color, rec in self._recordings.items():
+            lines.append(f"  [{color}] {rec!r}")
+        return "\n".join(lines)
