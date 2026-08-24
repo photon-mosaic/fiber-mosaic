@@ -1,32 +1,49 @@
-"""Single-color and multi-color fiber photometry recordings."""
+"""
+Core classes for fiber photometry data handling.
+
+This module provides the base classes that form the foundation of fiber-mosaic:
+
+- BaseFiberPhotometryExtractor: A per-color recording (wraps SI BaseRecording)
+- FiberPhotometryRecordingGroup: A container for multiple colors sharing fibers
+"""
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Sequence
 
 import numpy as np
-from spikeinterface.core.baserecording import BaseRecording
+from numpy.typing import ArrayLike
+from spikeinterface.core import BaseRecording
+from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 
 class BaseFiberPhotometryExtractor(BaseRecording):
     """
-    Single-color fiber photometry recording.
+    Base class for fiber photometry recordings.
 
-    Each channel corresponds to one fiber, so ``channel_ids`` are the fiber
-    identifiers. The ``color`` attribute records which emission/excitation
-    color this recording represents (e.g. ``"green"``, ``"red"``, ``"iso"``).
+    This class represents a single-color recording from a fiber photometry
+    experiment. It wraps SpikeInterface's BaseRecording and provides
+    fiber-photometry-specific vocabulary and methods:
+
+    - Channels are called "fibers"
+    - `get_fluorescence()` wraps `get_traces()` with fiber-native naming
+    - Per-fiber timestamps via `set_times()` and `get_fiber_times()`
+    - `get_streams()` for format-specific discovery of available data streams
+
+    Each color in an experiment should be its own BaseFiberPhotometryExtractor
+    instance, grouped together via FiberPhotometryRecordingGroup.
 
     Parameters
     ----------
     sampling_frequency : float
-        Nominal sampling rate in Hz. Actual per-sample times can be attached
-        via ``recording.set_times(...)`` after adding a segment.
-    fiber_ids : sequence
-        Fiber IDs, one per channel.
+        The nominal sampling frequency in Hz.
+    fiber_ids : list or array-like
+        Identifiers for each fiber (will be used as channel_ids internally).
     color : str
-        Emission/excitation color for this recording.
-    dtype : np.dtype or str
-        Data type of the traces.
+        The color/wavelength identifier for this recording
+        (e.g., "green", "red", "iso").
+    dtype : dtype, optional
+        The data type of the traces. Default is float64.
     """
 
     def __init__(
@@ -34,176 +51,72 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         sampling_frequency: float,
         fiber_ids: Sequence,
         color: str,
-        dtype,
-    ) -> None:
-        """Initialize the recording with fiber IDs, color, and dtype."""
-        channel_ids = list(fiber_ids)
+        dtype: np.dtype = np.float64,
+    ):
+        # Pass fiber_ids as channel_ids to SI's BaseRecording
         BaseRecording.__init__(
             self,
             sampling_frequency=sampling_frequency,
-            channel_ids=channel_ids,
+            channel_ids=list(fiber_ids),
             dtype=dtype,
         )
-        self.color = color
-        self._kwargs["color"] = color
-        self._kwargs["fiber_ids"] = channel_ids
+        self._color = color
+        # Store kwargs for serialization
+        self._kwargs = {
+            "sampling_frequency": sampling_frequency,
+            "fiber_ids": list(fiber_ids),
+            "color": color,
+            "dtype": str(dtype),
+        }
+
+    @property
+    def color(self) -> str:
+        """Return the color/wavelength identifier for this recording."""
+        return self._color
 
     @property
     def fiber_ids(self) -> np.ndarray:
-        """Fiber IDs for this recording, one per channel."""
-        return np.asarray(self.get_channel_ids())
+        """Return the fiber identifiers (alias for channel_ids)."""
+        return self.get_channel_ids()
 
     def get_fiber_ids(self) -> np.ndarray:
-        """Return :attr:`fiber_ids` (method-style accessor)."""
-        return self.fiber_ids
+        """Return the fiber identifiers (alias for get_channel_ids)."""
+        return self.get_channel_ids()
 
     def get_num_fibers(self) -> int:
-        """Return the number of fibers (channels) in this recording."""
+        """Return the number of fibers (alias for get_num_channels)."""
         return self.get_num_channels()
-
-    def has_fiber_times(self, segment_index: int | None = None) -> bool:
-        """Return True when explicit per-fiber times are stored for segment."""
-        segment_index = self._check_segment_index(segment_index)
-        rs = self.segments[segment_index]
-        return hasattr(rs, "_fiber_times") and rs._fiber_times is not None
-
-    def set_times(
-        self,
-        times,
-        segment_index: int | None = None,
-        with_warning: bool = True,
-    ) -> None:
-        """Set per-fiber times for one segment.
-
-        Accepts either a 1-D vector of shape ``(n_samples,)`` and broadcasts
-        to all fibers, or a 2-D matrix of shape ``(n_samples, n_fibers)``.
-        """
-        segment_index = self._check_segment_index(segment_index)
-        rs = self.segments[segment_index]
-
-        times_arr = np.asarray(times, dtype="float64")
-        n_samples = rs.get_num_samples()
-        n_fibers = self.get_num_fibers()
-
-        if times_arr.ndim == 1:
-            if times_arr.shape[0] != n_samples:
-                raise ValueError(
-                    "1-D times must have shape (n_samples,) matching the "
-                    "selected segment."
-                )
-            fiber_times = np.broadcast_to(
-                times_arr[:, np.newaxis], (n_samples, n_fibers)
-            ).copy()
-        elif times_arr.ndim == 2:
-            if times_arr.shape != (n_samples, n_fibers):
-                raise ValueError(
-                    "2-D times must have shape (n_samples, n_fibers)."
-                )
-            fiber_times = times_arr
-        else:
-            raise ValueError("times must be 1-D or 2-D.")
-
-        rs._fiber_times = fiber_times
-
-    def get_fiber_times(
-        self,
-        segment_index: int | None = None,
-        start_frame: int | None = None,
-        end_frame: int | None = None,
-        fiber_ids: list | np.ndarray | tuple | None = None,
-    ) -> np.ndarray:
-        """Return per-fiber times with optional frame/fiber subsetting."""
-        segment_index = self._check_segment_index(segment_index)
-        rs = self.segments[segment_index]
-
-        if self.has_fiber_times(segment_index=segment_index):
-            times = rs._fiber_times
-        else:
-            n_samples = rs.get_num_samples()
-            dt = 1.0 / self.get_sampling_frequency()
-            base_times = np.arange(n_samples, dtype="float64") * dt
-            times = np.broadcast_to(
-                base_times[:, np.newaxis], (n_samples, self.get_num_fibers())
-            )
-
-        if start_frame is None:
-            start_frame = 0
-        if end_frame is None:
-            end_frame = rs.get_num_samples()
-
-        times = times[start_frame:end_frame]
-
-        if fiber_ids is not None:
-            channel_ids = np.asarray(self.get_channel_ids())
-            fiber_ids = np.asarray(fiber_ids)
-            channel_inds = [
-                int(np.where(channel_ids == fid)[0][0]) for fid in fiber_ids
-            ]
-            times = times[:, channel_inds]
-
-        return times
-
-    @classmethod
-    def get_streams(cls, *args, **kwargs) -> tuple[list, list]:
-        """
-        List the data streams available in a source before instantiation.
-
-        Mirrors spikeinterface's extractor discovery step: a raw fiber
-        photometry file (e.g. TDT, Doric, Neurophotometrics) usually bundles
-        several streams -- different excitation/LED colors, demodulated vs.
-        raw signals, analog inputs, TTLs. Call this on a concrete subclass to
-        see what is available, then pass the chosen ``stream_id`` /
-        ``stream_name`` to that subclass's constructor.
-
-        Parameters
-        ----------
-        *args, **kwargs
-            Source locator (e.g. a file path) and format-specific options,
-            defined by the concrete subclass.
-
-        Returns
-        -------
-        stream_names : list of str
-            Human-readable name for each stream.
-        stream_ids : list
-            Stable identifier for each stream, aligned with ``stream_names``.
-
-        Notes
-        -----
-        The base extractor reads no file format, so it has no streams. Concrete
-        file-reading subclasses must override this method.
-        """
-        raise NotImplementedError(
-            f"{cls.__name__} does not read a file format and has no streams. "
-            "Concrete file-reading subclasses must override get_streams() to "
-            "return (stream_names, stream_ids)."
-        )
 
     def get_fluorescence(
         self,
         segment_index: int | None = None,
         start_frame: int | None = None,
         end_frame: int | None = None,
-        fiber_ids: list | np.ndarray | tuple | None = None,
+        fiber_ids: Sequence | None = None,
     ) -> np.ndarray:
         """
-        Return fluorescence traces, shape ``(n_samples, n_fibers)``.
+        Get fluorescence traces for specified fibers and time range.
 
-        Fiber-photometry-native wrapper around
-        :meth:`~spikeinterface.core.BaseRecording.get_traces`. Drops
-        ephys-only options (``order``, ``return_scaled``, ``return_in_uV``)
-        and renames ``channel_ids`` to ``fiber_ids``.
+        This is a fiber-native wrapper around `get_traces()` that uses
+        fiber-photometry vocabulary.
 
         Parameters
         ----------
-        segment_index : int or None, default: None
-            Segment to read from. Required for multi-segment recordings.
-        start_frame : int or None, default: None
-            Start sample, or 0 if None.
-        end_frame : int or None, default: None
-            End sample, or num_samples if None.
-        fiber_ids : sequence or None, default: None
-            Subset of fibers to return. If None, all fibers are returned.
+        segment_index : int, optional
+            The segment index. If None and only one segment exists,
+            defaults to 0.
+        start_frame : int, optional
+            The start frame. If None, starts from the beginning.
+        end_frame : int, optional
+            The end frame (exclusive). If None, reads to the end.
+        fiber_ids : list or array-like, optional
+            The fiber IDs to retrieve. If None, returns all fibers.
+
+        Returns
+        -------
+        traces : np.ndarray
+            Array of shape (n_samples, n_fibers) containing the
+            fluorescence data.
         """
         return self.get_traces(
             segment_index=segment_index,
@@ -211,6 +124,224 @@ class BaseFiberPhotometryExtractor(BaseRecording):
             end_frame=end_frame,
             channel_ids=fiber_ids,
         )
+
+    def set_times(
+        self,
+        times: ArrayLike,
+        segment_index: int | None = None,
+    ) -> None:
+        """
+        Set per-fiber timestamps for this recording.
+
+        Unlike SpikeInterface's set_times (which sets a single shared time
+        vector), this method supports per-fiber timestamps stored as a 2D
+        array.
+
+        Parameters
+        ----------
+        times : array-like
+            Time values in seconds. Can be:
+            - 1D array of shape (n_samples,): broadcast to all fibers
+            - 2D array of shape (n_samples, n_fibers): one column per fiber
+        segment_index : int, optional
+            The segment index. If None and only one segment exists,
+            defaults to 0.
+        """
+        segment_index = self._check_segment_index(segment_index)
+        rs = self._recording_segments[segment_index]
+
+        times = np.asarray(times)
+        n_samples = self.get_num_samples(segment_index)
+        n_fibers = self.get_num_fibers()
+
+        # Validate and reshape times
+        if times.ndim == 1:
+            if len(times) != n_samples:
+                raise ValueError(
+                    f"1D times array length ({len(times)}) must match "
+                    f"number of samples ({n_samples})"
+                )
+            # Broadcast 1D to 2D (n_samples, n_fibers)
+            broadcast_shape = (n_samples, n_fibers)
+            times = np.broadcast_to(
+                times[:, np.newaxis], broadcast_shape
+            ).copy()
+        elif times.ndim == 2:
+            if times.shape != (n_samples, n_fibers):
+                raise ValueError(
+                    f"2D times array shape {times.shape} must match "
+                    f"(n_samples={n_samples}, n_fibers={n_fibers})"
+                )
+        else:
+            msg = f"times must be 1D or 2D array, got {times.ndim}D"
+            raise ValueError(msg)
+
+        # Store per-fiber times on the segment
+        rs.fiber_time_vectors = times
+
+    def has_fiber_times(self, segment_index: int | None = None) -> bool:
+        """
+        Check if per-fiber timestamps have been set.
+
+        Parameters
+        ----------
+        segment_index : int, optional
+            The segment index. If None and only one segment exists,
+            defaults to 0.
+
+        Returns
+        -------
+        bool
+            True if per-fiber timestamps are available.
+        """
+        segment_index = self._check_segment_index(segment_index)
+        rs = self._recording_segments[segment_index]
+        has_attr = hasattr(rs, "fiber_time_vectors")
+        return has_attr and rs.fiber_time_vectors is not None
+
+    def get_fiber_times(
+        self,
+        segment_index: int | None = None,
+        start_frame: int | None = None,
+        end_frame: int | None = None,
+        fiber_ids: Sequence | None = None,
+    ) -> np.ndarray:
+        """
+        Get per-fiber timestamps.
+
+        If per-fiber times were set via set_times(), returns those. Otherwise,
+        falls back to the nominal SI timestamps and broadcasts them to all
+        fibers.
+
+        Parameters
+        ----------
+        segment_index : int, optional
+            The segment index. If None and only one segment exists,
+            defaults to 0.
+        start_frame : int, optional
+            The start frame. If None, starts from the beginning.
+        end_frame : int, optional
+            The end frame (exclusive). If None, reads to the end.
+        fiber_ids : list or array-like, optional
+            The fiber IDs to retrieve. If None, returns all fibers.
+
+        Returns
+        -------
+        times : np.ndarray
+            Array of shape (n_samples, n_fibers) containing timestamps.
+        """
+        segment_index = self._check_segment_index(segment_index)
+        rs = self._recording_segments[segment_index]
+
+        # Resolve frame range
+        n_samples = self.get_num_samples(segment_index)
+        if start_frame is None:
+            start_frame = 0
+        if end_frame is None:
+            end_frame = n_samples
+
+        # Resolve fiber indices
+        if fiber_ids is None:
+            fiber_indices = slice(None)
+        else:
+            fiber_indices = self.ids_to_indices(fiber_ids)
+
+        # Get per-fiber times if available, else fall back to nominal
+        if self.has_fiber_times(segment_index):
+            return rs.fiber_time_vectors[start_frame:end_frame, fiber_indices]
+        else:
+            # Fall back to SI's nominal timestamps, broadcast to all fibers
+            times_1d = self.get_times(segment_index=segment_index)
+            times_1d = times_1d[start_frame:end_frame]
+            if fiber_ids is not None:
+                n_fibers = len(fiber_ids)
+            else:
+                n_fibers = self.get_num_fibers()
+            return np.broadcast_to(
+                times_1d[:, np.newaxis], (len(times_1d), n_fibers)
+            ).copy()
+
+    @classmethod
+    def get_streams(
+        cls, file_path: str, **kwargs
+    ) -> tuple[list[str], list[str]]:
+        """
+        Discover available streams in a file.
+
+        This is a discovery hook that file-format-specific readers should
+        override. Returns the available stream names and IDs so users can
+        choose which to load.
+
+        Parameters
+        ----------
+        file_path : str
+            Path to the file or folder to inspect.
+        **kwargs
+            Format-specific discovery options. Most readers ignore these;
+            some accept keywords that mirror their constructor (e.g. the CSV
+            reader accepts ``time_column`` so discovery excludes the same
+            column the loader will). Overrides should declare the options
+            they support explicitly.
+
+        Returns
+        -------
+        stream_names : list of str
+            Human-readable names of available streams.
+        stream_ids : list of str
+            Identifiers to pass to the reader's constructor.
+
+        Raises
+        ------
+        NotImplementedError
+            If the subclass does not implement this method.
+        """
+        raise NotImplementedError(
+            f"{cls.__name__}.get_streams() must be implemented by file readers"
+        )
+
+    def _add_numpy_segment(
+        self,
+        traces: np.ndarray,
+        timestamps: np.ndarray,
+    ) -> None:
+        """
+        Add an in-memory segment and set per-fiber timestamps.
+
+        Convenience method used by all file-format extractors that load
+        data into NumPy arrays. Calls :meth:`add_segment` and
+        :meth:`set_times` so subclasses do not repeat the boilerplate.
+
+        Parameters
+        ----------
+        traces : np.ndarray
+            2-D array of shape ``(n_samples, n_fibers)``. Cast to float64
+            before storing.
+        timestamps : np.ndarray
+            1-D array of timestamps in seconds, length ``n_samples``.
+        """
+        t_start = float(timestamps[0]) if len(timestamps) > 0 else 0.0
+        segment = NumpyRecordingSegment(
+            traces=traces.astype(np.float64),
+            sampling_frequency=self.get_sampling_frequency(),
+            t_start=t_start,
+        )
+        self.add_segment(segment)
+        self.set_times(timestamps)
+
+    def add_segment(self, segment) -> None:
+        """
+        Add a segment to this recording.
+
+        This is a thin wrapper around BaseExtractor.add_segment for API
+        consistency.
+
+        Parameters
+        ----------
+        segment : BaseRecordingSegment
+            The segment to add.
+        """
+        self._recording_segments.append(segment)
+        segment.set_parent_extractor(self)
 
     def __repr__(self) -> str:
         """Return a one-line summary: class, color, fiber/segment count."""
@@ -227,84 +358,114 @@ class BaseFiberPhotometryExtractor(BaseRecording):
 
 class FiberPhotometryRecordingGroup:
     """
-    Container of per-color fiber photometry recordings sharing a fiber set.
+    A container for multiple fiber photometry recordings sharing fibers.
 
-    Each inner recording is a :class:`BaseFiberPhotometryExtractor` (or any
-    :class:`~spikeinterface.core.BaseRecording`) where channels are fibers.
-    The group itself is *not* a ``BaseRecording`` — colors can have different
-    time bases, so there is no single set of traces to return.
+    This class groups several per-color recordings
+    (BaseFiberPhotometryExtractor instances) that share the same fiber
+    layout but may have different timebases or sample counts.
+
+    This is NOT a BaseRecording because the colors can have different
+    timebases, so there's no single trace matrix to return.
 
     Parameters
     ----------
-    recordings : dict[str, BaseFiberPhotometryExtractor]
-        Mapping from color to per-color recording. All recordings must share
-        the same ``channel_ids`` (fiber IDs) in the same order.
+    recordings : dict
+        A dictionary mapping color names to
+        BaseFiberPhotometryExtractor instances. All recordings must have
+        identical fiber_ids in the same order.
+
+    Examples
+    --------
+    >>> green = CsvFiberPhotometryExtractor("green.csv", color="green")
+    >>> iso = CsvFiberPhotometryExtractor("iso.csv", color="iso")
+    >>> group = FiberPhotometryRecordingGroup({"green": green, "iso": iso})
+    >>> group.colors
+    ['green', 'iso']
+    >>> group["green"].get_fluorescence()
     """
 
-    def __init__(self, recordings: dict[str, BaseRecording]) -> None:
-        """Store per-color recordings; validate they share the same fibers."""
+    def __init__(self, recordings: dict[str, BaseRecording]):
         if not recordings:
-            raise ValueError("recordings must be non-empty")
+            raise ValueError("recordings dict cannot be empty")
 
-        self._recordings: dict[str, BaseRecording] = dict(recordings)
+        self._recordings = dict(recordings)
+        self._validate_fiber_ids()
 
-        fiber_sets = {
-            color: tuple(rec.get_fiber_ids())
-            for color, rec in self._recordings.items()
-        }
-        unique = set(fiber_sets.values())
-        if len(unique) > 1:
-            raise ValueError(
-                f"Fiber IDs differ across colors: {fiber_sets}. "
-                "All per-color recordings must share the same fibers."
-            )
+    def _validate_fiber_ids(self) -> None:
+        """Validate that all recordings have identical fiber_ids."""
+        fiber_ids_list = [
+            tuple(rec.get_channel_ids()) for rec in self._recordings.values()
+        ]
+        reference = fiber_ids_list[0]
+        for color, fiber_ids in zip(
+            self._recordings.keys(), fiber_ids_list, strict=True
+        ):
+            if fiber_ids != reference:
+                raise ValueError(
+                    f"Recording '{color}' has different fiber_ids "
+                    f"than the first recording. All recordings must "
+                    f"share identical fiber_ids in the same order."
+                )
 
     @property
     def colors(self) -> list[str]:
-        """List of color labels in insertion order."""
+        """Return the list of color names in this group."""
         return list(self._recordings.keys())
 
     @property
     def fiber_ids(self) -> np.ndarray:
-        """Shared fiber IDs across all colors."""
-        first = next(iter(self._recordings.values()))
-        return np.asarray(first.get_channel_ids())
+        """Return the shared fiber identifiers."""
+        first_rec = next(iter(self._recordings.values()))
+        return first_rec.get_channel_ids()
 
     def get_num_fibers(self) -> int:
-        """Return the number of fibers shared across all colors."""
+        """Return the number of fibers shared by all recordings."""
         return len(self.fiber_ids)
 
     def get_recording(self, color: str) -> BaseRecording:
-        """Return the per-color recording for ``color``."""
+        """
+        Get the recording for a specific color.
+
+        Parameters
+        ----------
+        color : str
+            The color name.
+
+        Returns
+        -------
+        BaseRecording
+            The recording for the specified color.
+        """
         return self._recordings[color]
 
+    # Dict-like access
     def __getitem__(self, color: str) -> BaseRecording:
-        """Return the per-color recording via ``group[color]``."""
+        """Return the recording for a specific color."""
         return self._recordings[color]
 
     def __contains__(self, color: str) -> bool:
-        """Return True if ``color`` is one of the recordings in this group."""
+        """Check if a color exists in this group."""
         return color in self._recordings
-
-    def __iter__(self) -> Iterator[str]:
-        """Iterate over color labels."""
-        return iter(self._recordings)
 
     def __len__(self) -> int:
         """Return the number of colors in this group."""
         return len(self._recordings)
 
-    def items(self):
-        """Return ``(color, recording)`` pairs (dict-style view)."""
-        return self._recordings.items()
-
-    def values(self):
-        """Return the per-color recordings (dict-style view)."""
-        return self._recordings.values()
+    def __iter__(self) -> Iterable[str]:
+        """Iterate over color names in this group."""
+        return iter(self._recordings)
 
     def keys(self):
-        """Return the color labels (dict-style view)."""
+        """Return the color names in this group."""
         return self._recordings.keys()
+
+    def values(self):
+        """Return the recordings in this group."""
+        return self._recordings.values()
+
+    def items(self):
+        """Return (color, recording) pairs in this group."""
+        return self._recordings.items()
 
     def __repr__(self) -> str:
         """Return a multi-line summary listing each per-color recording."""

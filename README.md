@@ -20,6 +20,20 @@ To develop the code, run:
 pip install -e .[dev]
 ```
 
+### Test data and Git LFS
+
+The sample recordings under [`resources/`](resources/README.md) are stored in
+[Git LFS](https://git-lfs.com). Install it **before** cloning, then pull the data:
+
+```bash
+git lfs install
+git lfs pull
+```
+
+Without `git-lfs`, those files check out as small text pointers rather than real
+recordings, and the format tests fail with confusing parse errors. If you cloned
+first and installed LFS afterwards, `git lfs pull` fixes it in place.
+
 ## Examples
 
 A runnable walkthrough lives in [`examples/quickstart.ipynb`](examples/quickstart.ipynb): building per-color recordings, reading fluorescence with the fiber-native API, attaching per-fiber timestamps with `set_times`, bundling colors into a `FiberPhotometryRecordingGroup`, and discovering streams with `get_streams`.

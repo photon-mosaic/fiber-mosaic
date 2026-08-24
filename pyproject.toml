@@ -17,13 +17,19 @@ dynamic = ["version"]
 
 dependencies = [
      'numpy',
+     'pandas',
      'spikeinterface @ git+https://github.com/SpikeInterface/spikeinterface.git@main',
 ]
 
 [project.optional-dependencies]
+# Format-specific readers that rely on optional third-party libraries.
+doric = ['h5py']
+nwb = ['pynwb']
 dev = [
     'coverage',
     'furo',
+    'h5py',
+    'pynwb',
     'pytest',
     'pytest-cov',
     'ruff==0.15.12',
@@ -32,6 +38,9 @@ dev = [
 
 [tool.pdm.build]
 package-dir = "src"
+
+[tool.setuptools.dynamic]
+version = {attr = "fiber_mosaic.__version__"}
 
 [tool.pdm.version]
 source = "scm"
