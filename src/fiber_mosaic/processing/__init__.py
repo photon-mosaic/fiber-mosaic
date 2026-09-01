@@ -22,7 +22,6 @@ FiberPhotometryRecordingGroup, and returns the matching container:
 
 from __future__ import annotations
 
-
 from fiber_mosaic.processing.from_si import (
     FiberBandpassFilterRecording,
     FiberCenterRecording,
@@ -60,7 +59,12 @@ _all_processer_dict = {
 # we control import in the preprocessing init by setting an __all__
 
 # pp_function.__name__ gives the name of the function that users should use
-__all__ = [pp_function.__name__ for pp_function in _all_processer_dict.values()]
+__all__ = [
+    pp_function.__name__ for pp_function in _all_processer_dict.values()
+]
 
-processor_dict = {pp_class.__name__: pp_function for pp_class, pp_function in _all_processer_dict.items()}
+processor_dict = {
+    pp_class.__name__: pp_function
+    for pp_class, pp_function in _all_processer_dict.items()
+}
 __all__.append("preprocessor_dict")
