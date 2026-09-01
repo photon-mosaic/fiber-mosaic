@@ -14,6 +14,7 @@ __version__ = "0.1.0"
 
 from .core.base import (
     BaseFiberPhotometryExtractor,
+    FiberPhotometryMixin,
     FiberPhotometryRecordingGroup,
 )
 
@@ -46,6 +47,7 @@ from .extractors import (
 __all__ = [
     # Core classes
     "BaseFiberPhotometryExtractor",
+    "FiberPhotometryMixin",
     "FiberPhotometryRecordingGroup",
     # Format detection
     "detect_formats",
