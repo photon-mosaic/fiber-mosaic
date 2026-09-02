@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from spikeinterface.core import BaseRecording
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 from fiber_mosaic.core.base import (
     BaseFiberPhotometryExtractor,
+    FiberPhotometryMixin,
     FiberPhotometryRecordingGroup,
 )
 
@@ -262,6 +264,101 @@ def test_set_times_multi_segment():
     assert rec.has_fiber_times(segment_index=0)
     np.testing.assert_array_equal(rec.get_fiber_times(segment_index=0), t0)
     np.testing.assert_array_equal(rec.get_fiber_times(segment_index=1), t1)
+
+
+# ---------------- FiberPhotometryMixin ----------------
+
+
+class _PlainFiberRecording(FiberPhotometryMixin, BaseRecording):
+    """A non-extractor host for the mixin, standing in for a preprocessor.
+
+    Mirrors what a SpikeInterface preprocessor looks like from the mixin's
+    point of view: a plain ``BaseRecording`` that never runs
+    ``BaseFiberPhotometryExtractor.__init__``, so it has no ``color``
+    attribute and none of the extractor's source-side machinery.
+    """
+
+    def __init__(self, sampling_frequency, fiber_ids, color, dtype):
+        BaseRecording.__init__(
+            self,
+            sampling_frequency=sampling_frequency,
+            channel_ids=list(fiber_ids),
+            dtype=dtype,
+        )
+        self.annotate(color=color)
+
+
+def _make_plain_recording(n_samples=10, fiber_ids=("f0", "f1", "f2")):
+    """Build a mixin-only recording with deterministic ramp traces."""
+    sampling_frequency = 100.0
+    rec = _PlainFiberRecording(
+        sampling_frequency=sampling_frequency,
+        fiber_ids=fiber_ids,
+        color="green",
+        dtype="float32",
+    )
+    traces = np.arange(n_samples * len(fiber_ids), dtype="float32").reshape(
+        n_samples, len(fiber_ids)
+    )
+    segment = NumpyRecordingSegment(
+        traces=traces,
+        sampling_frequency=sampling_frequency,
+        t_start=None,
+    )
+    rec.add_segment(segment)
+    return rec, traces
+
+
+def test_mixin_provides_fiber_api_off_a_plain_recording():
+    """The fiber API works on a host that is not an extractor.
+
+    This is the point of the split: a preprocessor cannot inherit from
+    BaseFiberPhotometryExtractor, so the fiber-native surface has to work
+    when mixed into a plain BaseRecording.
+    """
+    rec, traces = _make_plain_recording()
+
+    assert rec.color == "green"
+    assert rec.get_num_fibers() == 3
+    np.testing.assert_array_equal(rec.fiber_ids, np.array(["f0", "f1", "f2"]))
+    np.testing.assert_array_equal(rec.get_fiber_ids(), rec.fiber_ids)
+    np.testing.assert_array_equal(rec.get_fluorescence(), traces)
+    assert "color=green" in repr(rec)
+
+
+def test_mixin_per_fiber_times_round_trip():
+    """set_times/get_fiber_times work off a non-extractor host too."""
+    rec, _ = _make_plain_recording()
+    times = np.linspace(0.0, 1.0, rec.get_num_samples())[:, None] + np.array(
+        [0.0, 0.001, 0.002]
+    )
+
+    assert not rec.has_fiber_times()
+    rec.set_times(times)
+    assert rec.has_fiber_times()
+    np.testing.assert_allclose(rec.get_fiber_times(), times)
+
+
+def test_color_survives_copy_metadata(recording):
+    """Color rides on an annotation, so copy_metadata carries it.
+
+    SpikeInterface's BasePreprocessor propagates metadata with
+    ``copy_metadata(only_main=False)``, which copies annotations but not
+    attributes -- so the color has to be an annotation to reach a
+    preprocessor at all.
+    """
+    rec, _ = recording
+    other = BaseFiberPhotometryExtractor(
+        sampling_frequency=rec.get_sampling_frequency(),
+        fiber_ids=list(rec.get_channel_ids()),
+        color="placeholder",
+        dtype=rec.get_dtype(),
+    )
+
+    rec.copy_metadata(other, only_main=False)
+
+    assert other.get_annotation("color") == "green"
+    assert other.color == "green"
 
 
 # ---------------- FiberPhotometryRecordingGroup ----------------

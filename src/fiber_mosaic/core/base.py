@@ -3,6 +3,7 @@ Core classes for fiber photometry data handling.
 
 This module provides the base classes that form the foundation of fiber-mosaic:
 
+- FiberPhotometryMixin: The fiber-native API, mixable into any SI recording
 - BaseFiberPhotometryExtractor: A per-color recording (wraps SI BaseRecording)
 - FiberPhotometryRecordingGroup: A container for multiple colors sharing fibers
 """
@@ -17,62 +18,69 @@ from spikeinterface.core import BaseRecording
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 
-class BaseFiberPhotometryExtractor(BaseRecording):
+def _segment_fiber_times(segment) -> np.ndarray | None:
     """
-    Base class for fiber photometry recordings.
+    Return a segment's per-fiber times matrix, or None if it has none.
 
-    This class represents a single-color recording from a fiber photometry
-    experiment. It wraps SpikeInterface's BaseRecording and provides
-    fiber-photometry-specific vocabulary and methods:
+    Two kinds of segment can answer. Source segments carry the matrix
+    directly, as written by :meth:`FiberPhotometryMixin.set_times`. Fiber
+    preprocessor segments expose ``get_fiber_times()`` instead and inherit
+    from their own parent segment, so a chain of preprocessors resolves
+    without copying anything.
+
+    Parameters
+    ----------
+    segment : BaseRecordingSegment
+        The segment to read.
+
+    Returns
+    -------
+    np.ndarray or None
+        Times of shape ``(n_samples, n_fibers)``, or None when this segment
+        has no per-fiber times.
+    """
+    getter = getattr(segment, "get_fiber_times", None)
+    if getter is not None:
+        return getter()
+    return getattr(segment, "fiber_time_vectors", None)
+
+
+class FiberPhotometryMixin:
+    """
+    Fiber-native API for fiber photometry recordings.
+
+    Provides fiber-photometry vocabulary and per-fiber timestamps on top of
+    a SpikeInterface recording:
 
     - Channels are called "fibers"
     - `get_fluorescence()` wraps `get_traces()` with fiber-native naming
     - Per-fiber timestamps via `set_times()` and `get_fiber_times()`
-    - `get_streams()` for format-specific discovery of available data streams
 
-    Each color in an experiment should be its own BaseFiberPhotometryExtractor
-    instance, grouped together via FiberPhotometryRecordingGroup.
+    This is deliberately separate from BaseFiberPhotometryExtractor, which
+    adds the source-side concerns (construction, stream discovery, segment
+    loading). Keeping the API in a mixin lets recording-to-recording classes
+    -- notably SpikeInterface preprocessors, which cannot inherit from an
+    extractor -- expose the same fiber-native surface.
 
-    Parameters
-    ----------
-    sampling_frequency : float
-        The nominal sampling frequency in Hz.
-    fiber_ids : list or array-like
-        Identifiers for each fiber (will be used as channel_ids internally).
-    color : str
-        The color/wavelength identifier for this recording
-        (e.g., "green", "red", "iso").
-    dtype : dtype, optional
-        The data type of the traces. Default is float64.
+    Notes
+    -----
+    Must be mixed into a SpikeInterface ``BaseRecording``, on whose
+    ``get_channel_ids``, ``get_num_channels``, ``get_num_samples``,
+    ``get_num_segments``, ``get_traces``, ``get_times``,
+    ``get_sampling_frequency``, ``get_dtype``, ``ids_to_indices``,
+    ``get_annotation``, ``get_parent``, ``_check_segment_index`` and
+    ``segments`` it relies. It defines no ``__init__``, so it never
+    interferes with the host class's construction.
+
+    The color is read from the ``"color"`` annotation rather than from an
+    attribute, because ``copy_metadata`` propagates annotations but not
+    attributes -- so the color survives SpikeInterface preprocessing steps.
     """
-
-    def __init__(
-        self,
-        sampling_frequency: float,
-        fiber_ids: Sequence,
-        color: str,
-        dtype: np.dtype = np.float64,
-    ):
-        # Pass fiber_ids as channel_ids to SI's BaseRecording
-        BaseRecording.__init__(
-            self,
-            sampling_frequency=sampling_frequency,
-            channel_ids=list(fiber_ids),
-            dtype=dtype,
-        )
-        self._color = color
-        # Store kwargs for serialization
-        self._kwargs = {
-            "sampling_frequency": sampling_frequency,
-            "fiber_ids": list(fiber_ids),
-            "color": color,
-            "dtype": str(dtype),
-        }
 
     @property
     def color(self) -> str:
         """Return the color/wavelength identifier for this recording."""
-        return self._color
+        return self.get_annotation("color")
 
     @property
     def fiber_ids(self) -> np.ndarray:
@@ -148,7 +156,7 @@ class BaseFiberPhotometryExtractor(BaseRecording):
             defaults to 0.
         """
         segment_index = self._check_segment_index(segment_index)
-        rs = self._recording_segments[segment_index]
+        rs = self.segments[segment_index]
 
         times = np.asarray(times)
         n_samples = self.get_num_samples(segment_index)
@@ -179,9 +187,56 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         # Store per-fiber times on the segment
         rs.fiber_time_vectors = times
 
+    def _resolve_fiber_times(self, segment_index: int) -> np.ndarray | None:
+        """
+        Find one segment's per-fiber times, looking upstream if needed.
+
+        Resolution order:
+
+        1. The segment itself -- either a source segment carrying the matrix
+           or a fiber preprocessor segment inheriting it (see
+           :func:`_segment_fiber_times`).
+        2. The parent recording, when this is a preprocessor wrapping one.
+           This covers upstream SpikeInterface preprocessors, whose segments
+           are built inside their own ``__init__`` and therefore know nothing
+           about fibers.
+
+        Step 2 only applies when the parent has the same number of samples.
+        A step that changes the sample count (``resample``, ``decimate``)
+        invalidates the parent's timestamps, so they are dropped rather than
+        misaligned.
+
+        Parameters
+        ----------
+        segment_index : int
+            The segment to resolve, already validated.
+
+        Returns
+        -------
+        np.ndarray or None
+            Times of shape ``(n_samples, n_fibers)``, or None if unavailable.
+        """
+        times = _segment_fiber_times(self.segments[segment_index])
+        if times is not None:
+            return times
+
+        parent = self.get_parent()
+        if parent is None or not hasattr(parent, "get_fiber_times"):
+            return None
+        same_length = parent.get_num_samples(
+            segment_index
+        ) == self.get_num_samples(segment_index)
+        if not same_length or not parent.has_fiber_times(segment_index):
+            return None
+        return parent.get_fiber_times(segment_index=segment_index)
+
     def has_fiber_times(self, segment_index: int | None = None) -> bool:
         """
-        Check if per-fiber timestamps have been set.
+        Check if per-fiber timestamps are available.
+
+        Follows the same resolution as :meth:`get_fiber_times`, so the two
+        never disagree: True means `get_fiber_times` returns real timestamps
+        rather than ones synthesized from the sampling frequency.
 
         Parameters
         ----------
@@ -195,9 +250,7 @@ class BaseFiberPhotometryExtractor(BaseRecording):
             True if per-fiber timestamps are available.
         """
         segment_index = self._check_segment_index(segment_index)
-        rs = self._recording_segments[segment_index]
-        has_attr = hasattr(rs, "fiber_time_vectors")
-        return has_attr and rs.fiber_time_vectors is not None
+        return self._resolve_fiber_times(segment_index) is not None
 
     def get_fiber_times(
         self,
@@ -209,9 +262,11 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         """
         Get per-fiber timestamps.
 
-        If per-fiber times were set via set_times(), returns those. Otherwise,
-        falls back to the nominal SI timestamps and broadcasts them to all
-        fibers.
+        Returns real per-fiber timestamps when they are available -- set on
+        this recording via `set_times()`, or inherited from a parent
+        recording it preprocesses (see :meth:`_resolve_fiber_times`).
+        Otherwise falls back to the nominal SI timestamps, broadcast to all
+        fibers; `has_fiber_times()` distinguishes the two cases.
 
         Parameters
         ----------
@@ -231,7 +286,6 @@ class BaseFiberPhotometryExtractor(BaseRecording):
             Array of shape (n_samples, n_fibers) containing timestamps.
         """
         segment_index = self._check_segment_index(segment_index)
-        rs = self._recording_segments[segment_index]
 
         # Resolve frame range
         n_samples = self.get_num_samples(segment_index)
@@ -247,8 +301,9 @@ class BaseFiberPhotometryExtractor(BaseRecording):
             fiber_indices = self.ids_to_indices(fiber_ids)
 
         # Get per-fiber times if available, else fall back to nominal
-        if self.has_fiber_times(segment_index):
-            return rs.fiber_time_vectors[start_frame:end_frame, fiber_indices]
+        fiber_times = self._resolve_fiber_times(segment_index)
+        if fiber_times is not None:
+            return fiber_times[start_frame:end_frame, fiber_indices]
         else:
             # Fall back to SI's nominal timestamps, broadcast to all fibers
             times_1d = self.get_times(segment_index=segment_index)
@@ -260,6 +315,70 @@ class BaseFiberPhotometryExtractor(BaseRecording):
             return np.broadcast_to(
                 times_1d[:, np.newaxis], (len(times_1d), n_fibers)
             ).copy()
+
+    def __repr__(self) -> str:
+        """Return a one-line summary: class, color, fiber/segment count."""
+        n_seg = self.get_num_segments()
+        n_fib = self.get_num_fibers()
+        sf = self.get_sampling_frequency()
+        dtype = self.get_dtype()
+        return (
+            f"{self.__class__.__name__} | color={self.color} | "
+            f"{n_fib} fiber(s) | {n_seg} segment(s) | "
+            f"{sf:.1f} Hz | dtype: {dtype}"
+        )
+
+
+class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
+    """
+    Base class for fiber photometry recordings.
+
+    This class represents a single-color recording from a fiber photometry
+    experiment. It wraps SpikeInterface's BaseRecording, takes its
+    fiber-native API from FiberPhotometryMixin, and adds the source-side
+    concerns: construction, `get_streams()` for format-specific discovery of
+    available data streams, and segment loading.
+
+    Each color in an experiment should be its own BaseFiberPhotometryExtractor
+    instance, grouped together via FiberPhotometryRecordingGroup.
+
+    Parameters
+    ----------
+    sampling_frequency : float
+        The nominal sampling frequency in Hz.
+    fiber_ids : list or array-like
+        Identifiers for each fiber (will be used as channel_ids internally).
+    color : str
+        The color/wavelength identifier for this recording
+        (e.g., "green", "red", "iso").
+    dtype : dtype, optional
+        The data type of the traces. Default is float64.
+    """
+
+    def __init__(
+        self,
+        sampling_frequency: float,
+        fiber_ids: Sequence,
+        color: str,
+        dtype: np.dtype = np.float64,
+    ):
+        # Pass fiber_ids as channel_ids to SI's BaseRecording
+        BaseRecording.__init__(
+            self,
+            sampling_frequency=sampling_frequency,
+            channel_ids=list(fiber_ids),
+            dtype=dtype,
+        )
+        # Store the color as an annotation, not an attribute, so that
+        # copy_metadata carries it across SpikeInterface preprocessing steps.
+        self.annotate(color=color)
+        # Store kwargs for serialization
+        self._kwargs = {
+            "sampling_frequency": sampling_frequency,
+            "fiber_ids": list(fiber_ids),
+            "color": color,
+            "dtype": str(dtype),
+        }
 
     @classmethod
     def get_streams(
@@ -327,33 +446,6 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         )
         self.add_segment(segment)
         self.set_times(timestamps)
-
-    def add_segment(self, segment) -> None:
-        """
-        Add a segment to this recording.
-
-        This is a thin wrapper around BaseExtractor.add_segment for API
-        consistency.
-
-        Parameters
-        ----------
-        segment : BaseRecordingSegment
-            The segment to add.
-        """
-        self._recording_segments.append(segment)
-        segment.set_parent_extractor(self)
-
-    def __repr__(self) -> str:
-        """Return a one-line summary: class, color, fiber/segment count."""
-        n_seg = self.get_num_segments()
-        n_fib = self.get_num_fibers()
-        sf = self.get_sampling_frequency()
-        dtype = self.get_dtype()
-        return (
-            f"{self.__class__.__name__} | color={self.color} | "
-            f"{n_fib} fiber(s) | {n_seg} segment(s) | "
-            f"{sf:.1f} Hz | dtype: {dtype}"
-        )
 
 
 class FiberPhotometryRecordingGroup:
