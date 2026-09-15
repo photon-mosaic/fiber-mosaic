@@ -11,6 +11,7 @@ from fiber_mosaic.core.base import (
     BaseFiberPhotometryExtractor,
     FiberPhotometryMixin,
     FiberPhotometryRecordingGroup,
+    recording_from_traces,
 )
 
 
@@ -360,6 +361,47 @@ def test_color_survives_copy_metadata(recording):
 
     assert other.get_annotation("color") == "green"
     assert other.color == "green"
+
+
+# ---------------- recording_from_traces ----------------
+
+
+def test_recording_from_traces_without_timestamps():
+    """No ``timestamps`` -> nominal times, from ``sampling_frequency``."""
+    traces = np.ones((10, 2), dtype="float32")
+    rec = recording_from_traces(
+        traces, color="green", sampling_frequency=100.0
+    )
+
+    assert isinstance(rec, FiberPhotometryMixin)
+    assert rec.color == "green"
+    assert not rec.has_fiber_times()
+
+
+def test_recording_from_traces_with_1d_timestamps():
+    """A bare 1-D ``timestamps`` array sets real times, single segment."""
+    traces = np.ones((10, 2), dtype="float32")
+    times = np.linspace(0.0, 0.09, 10) + 0.001  # jittery, not nominal
+
+    rec = recording_from_traces(traces, color="green", timestamps=times)
+
+    assert rec.has_fiber_times()
+    np.testing.assert_allclose(rec.get_fiber_times()[:, 0], times)
+    np.testing.assert_allclose(rec.get_fiber_times()[:, 1], times)
+
+
+def test_recording_from_traces_with_per_segment_timestamps():
+    """A list of ``timestamps`` sets real times per segment."""
+    traces = [np.ones((5, 2)), np.zeros((4, 2))]
+    times = [np.linspace(0.0, 0.04, 5), np.linspace(1.0, 1.03, 4)]
+
+    rec = recording_from_traces(traces, color="red", timestamps=times)
+
+    assert rec.has_fiber_times(segment_index=0)
+    assert rec.has_fiber_times(segment_index=1)
+    np.testing.assert_allclose(
+        rec.get_fiber_times(segment_index=1)[:, 0], times[1]
+    )
 
 
 # ---------------- FiberPhotometryRecordingGroup ----------------

@@ -394,12 +394,14 @@ def recording_from_traces(
     color: str,
     sampling_frequency: float = 30.0,
     fiber_ids: Sequence | None = None,
+    timestamps: np.ndarray | Sequence[np.ndarray] | None = None,
 ) -> BaseRecording:
     """Wrap traces arrays as a fiber photometry recording.
 
     A general-purpose constructor for building a fiber-native recording
     straight from in-memory arrays -- useful for synthetic data, quick
-    scripts, or any source without a dedicated file-reading subclass.
+    scripts, or wrapping real data that arrives as arrays plus timestamps,
+    without writing a dedicated file-reading subclass.
 
     Parameters
     ----------
@@ -409,9 +411,16 @@ def recording_from_traces(
     color : str
         Band label, e.g. ``"green"`` or ``"iso"``.
     sampling_frequency : float, default: 30.0
-        Acquisition rate in Hz.
+        Nominal acquisition rate in Hz, used for the SI time base. Still
+        required even when ``timestamps`` is given.
     fiber_ids : sequence or None, default: None
         Fiber IDs; defaults to ``"fiber_0" ... "fiber_n"``.
+    timestamps : array-like or sequence of array-like, optional
+        Real per-sample timestamps, one array per segment matching
+        ``traces`` (a bare array for a single segment). Passed to
+        :meth:`~FiberPhotometryMixin.set_times`, so each array may be 1-D
+        (broadcast to all fibers) or 2-D (one column per fiber). Omit to
+        fall back to nominal timestamps from `sampling_frequency`.
 
     Returns
     -------
@@ -436,6 +445,16 @@ def recording_from_traces(
         channel_ids=list(fiber_ids),
     )
     recording.annotate(color=color)
+
+    if timestamps is not None:
+        segments = (
+            [timestamps]
+            if isinstance(timestamps, np.ndarray)
+            else list(timestamps)
+        )
+        for segment_index, times in enumerate(segments):
+            recording.set_times(times, segment_index=segment_index)
+
     return recording
 
 
