@@ -395,18 +395,16 @@ def _segment_t_start(times: np.ndarray) -> float:
     Handles only the 1-D and 2-D shapes ``set_times`` itself supports (for
     2-D, one column per fiber -- fiber 0's first sample stands in for the
     segment's start, since ``t_start`` is a single SI-level scalar and
-    can't carry per-fiber jitter anyway) and returns 0.0 for an empty
-    segment. Any other shape also returns 0.0 rather than indexing into it
-    -- it's left for ``set_times`` (called right after construction, with
-    the same ``times``) to reject with its own clear dimension error.
+    can't carry per-fiber jitter anyway), and returns 0.0 for anything
+    empty or any other shape rather than indexing into it -- checking
+    ``size`` before any indexing (instead of after, per-branch) means no
+    zero-length axis, in either dimension, can raise. Malformed input is
+    left for ``set_times`` (called right after construction, with the same
+    ``times``) to reject with its own clear error.
     """
-    if times.ndim == 1:
-        first_column = times
-    elif times.ndim == 2:
-        first_column = times[:, 0]
-    else:
+    if times.size == 0 or times.ndim not in (1, 2):
         return 0.0
-    return float(first_column[0]) if first_column.size else 0.0
+    return float(times[0] if times.ndim == 1 else times[0, 0])
 
 
 def _timestamps_per_segment(

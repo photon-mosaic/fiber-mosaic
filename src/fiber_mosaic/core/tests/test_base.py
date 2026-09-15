@@ -484,6 +484,17 @@ def test_recording_from_traces_3d_timestamps_raises_cleanly():
         recording_from_traces(traces, color="green", timestamps=times)
 
 
+def test_recording_from_traces_2d_zero_columns_timestamps_raises_cleanly():
+    """A 2-D ``timestamps`` with zero columns raises ``set_times``'s own
+    shape-mismatch error, not an ``IndexError`` from computing
+    ``t_start``."""
+    traces = np.ones((5, 2), dtype="float32")
+    times = np.zeros((5, 0))
+
+    with pytest.raises(ValueError, match="must match"):
+        recording_from_traces(traces, color="green", timestamps=times)
+
+
 # ---------------- FiberPhotometryRecordingGroup ----------------
 
 
