@@ -463,36 +463,24 @@ def test_recording_from_traces_with_nested_list_2d_timestamps():
     np.testing.assert_allclose(rec.get_fiber_times(), times)
 
 
-def test_recording_from_traces_empty_timestamps_raises_cleanly():
-    """Empty ``timestamps`` for a non-empty segment raises a clear
-    length-mismatch error from ``set_times``, not a raw ``IndexError``
-    from the ``t_start`` computation."""
+@pytest.mark.parametrize(
+    "timestamps, match",
+    [
+        pytest.param(np.array([]), "must match", id="empty"),
+        pytest.param(np.zeros((5, 2, 1)), "1D or 2D", id="3d"),
+        pytest.param(np.zeros((5, 0)), "must match", id="2d_zero_columns"),
+    ],
+)
+def test_recording_from_traces_malformed_timestamps_raise_cleanly(
+    timestamps, match
+):
+    """Malformed ``timestamps`` (empty, wrong ndim, or a mismatched 2-D
+    shape) reach ``set_times``'s own clear errors, not a raw
+    ``IndexError``/``TypeError`` from computing ``t_start``."""
     traces = np.ones((5, 2), dtype="float32")
 
-    with pytest.raises(ValueError, match="must match"):
-        recording_from_traces(traces, color="green", timestamps=np.array([]))
-
-
-def test_recording_from_traces_3d_timestamps_raises_cleanly():
-    """A malformed (3-D) ``timestamps`` raises ``set_times``'s own
-    dimension error, not an ``IndexError``/``TypeError`` from computing
-    ``t_start``."""
-    traces = np.ones((5, 2), dtype="float32")
-    times = np.zeros((5, 2, 1))
-
-    with pytest.raises(ValueError, match="1D or 2D"):
-        recording_from_traces(traces, color="green", timestamps=times)
-
-
-def test_recording_from_traces_2d_zero_columns_timestamps_raises_cleanly():
-    """A 2-D ``timestamps`` with zero columns raises ``set_times``'s own
-    shape-mismatch error, not an ``IndexError`` from computing
-    ``t_start``."""
-    traces = np.ones((5, 2), dtype="float32")
-    times = np.zeros((5, 0))
-
-    with pytest.raises(ValueError, match="must match"):
-        recording_from_traces(traces, color="green", timestamps=times)
+    with pytest.raises(ValueError, match=match):
+        recording_from_traces(traces, color="green", timestamps=timestamps)
 
 
 # ---------------- FiberPhotometryRecordingGroup ----------------
