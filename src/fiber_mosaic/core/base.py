@@ -6,6 +6,10 @@ This module provides the base classes that form the foundation of fiber-mosaic:
 - FiberPhotometryMixin: The fiber-native API, mixable into any SI recording
 - BaseFiberPhotometryExtractor: A per-color recording (wraps SI BaseRecording)
 - FiberPhotometryRecordingGroup: A container for multiple colors sharing fibers
+- recording_from_traces: General-purpose constructor for wrapping plain numpy
+  arrays as a fiber-native recording (mixes FiberPhotometryMixin into SI's
+  own NumpyRecording -- used by :mod:`fiber_mosaic.synthetic` but not
+  specific to synthetic data)
 """
 
 from __future__ import annotations
@@ -15,7 +19,10 @@ from collections.abc import Iterable, Sequence
 import numpy as np
 from numpy.typing import ArrayLike
 from spikeinterface.core import BaseRecording
-from spikeinterface.core.numpyextractors import NumpyRecordingSegment
+from spikeinterface.core.numpyextractors import (
+    NumpyRecording,
+    NumpyRecordingSegment,
+)
 
 
 class FiberPhotometryMixin:
@@ -372,6 +379,139 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
         )
         self.add_segment(segment)
         self.set_times(timestamps)
+
+
+class _FiberNumpyRecording(FiberPhotometryMixin, NumpyRecording):
+    """SpikeInterface's ``NumpyRecording`` with the fiber-native API mixed in.
+
+    Not part of the public API -- constructed only by
+    :func:`recording_from_traces`, which also sets the ``color`` annotation.
+    """
+
+
+def _segment_t_start(times: np.ndarray) -> float:
+    """First-sample time as a scalar, for SI's per-segment ``t_start``.
+
+    Handles only the 1-D and 2-D shapes ``set_times`` itself supports (for
+    2-D, one column per fiber -- fiber 0's first sample stands in for the
+    segment's start, since ``t_start`` is a single SI-level scalar and
+    can't carry per-fiber jitter anyway), and returns 0.0 for anything
+    empty or any other shape rather than indexing into it -- checking
+    ``size`` before any indexing (instead of after, per-branch) means no
+    zero-length axis, in either dimension, can raise. Malformed input is
+    left for ``set_times`` (called right after construction, with the same
+    ``times``) to reject with its own clear error.
+    """
+    if times.size == 0 or times.ndim not in (1, 2):
+        return 0.0
+    return float(times[0] if times.ndim == 1 else times[0, 0])
+
+
+def _timestamps_per_segment(
+    timestamps: ArrayLike | Sequence[ArrayLike], num_segments: int
+) -> list[np.ndarray]:
+    """Split ``timestamps`` into one array per segment.
+
+    With a single segment, ``timestamps`` is that segment's own array-like
+    (1-D or 2-D, plain list or ``np.ndarray``) taken as a whole -- not split
+    apart. With more than one, it's a sequence with one array-like per
+    segment. Deciding from ``num_segments`` rather than sniffing
+    ``timestamps``' own shape is what lets a single 2-D segment be passed as
+    nested lists without misreading it as one 1-D segment per row.
+    """
+    if num_segments == 1:
+        segments = [np.asarray(timestamps)]
+    else:
+        segments = [np.asarray(times) for times in timestamps]
+
+    if len(segments) != num_segments:
+        raise ValueError(
+            "timestamps must provide one array per segment "
+            f"({num_segments} segments, got {len(segments)})"
+        )
+    return segments
+
+
+def recording_from_traces(
+    traces: np.ndarray | Sequence[np.ndarray],
+    color: str,
+    sampling_frequency: float = 30.0,
+    fiber_ids: Sequence | None = None,
+    timestamps: ArrayLike | Sequence[ArrayLike] | None = None,
+) -> BaseRecording:
+    """Wrap traces arrays as a fiber photometry recording.
+
+    A general-purpose constructor for building a fiber-native recording
+    straight from in-memory arrays -- useful for synthetic data, quick
+    scripts, or wrapping real data that arrives as arrays plus timestamps,
+    without writing a dedicated file-reading subclass.
+
+    Parameters
+    ----------
+    traces : np.ndarray or sequence of np.ndarray
+        One ``(num_samples, num_fibers)`` array for a single segment, or one
+        array per segment.
+    color : str
+        Band label, e.g. ``"green"`` or ``"iso"``.
+    sampling_frequency : float, default: 30.0
+        Nominal acquisition rate in Hz, used for the SI time base. Still
+        required even when ``timestamps`` is given.
+    fiber_ids : sequence or None, default: None
+        Fiber IDs; defaults to ``"fiber_0" ... "fiber_n"``.
+    timestamps : array-like or sequence of array-like, optional
+        Real per-sample timestamps, one array per segment matching
+        ``traces`` (a bare array-like for a single segment -- a plain list
+        is fine too). Passed to :meth:`~FiberPhotometryMixin.set_times`, so
+        each array may be 1-D (broadcast to all fibers) or 2-D (one column
+        per fiber); raises :exc:`ValueError` if the number of arrays
+        doesn't match ``traces``' segment count. Each segment's first
+        sample also becomes that segment's SI ``t_start``, so SI's own
+        (nominal, evenly-spaced) ``get_times()`` at least starts at the
+        right time instead of at zero; only
+        :meth:`~FiberPhotometryMixin.get_fiber_times` reflects the exact
+        supplied timestamps, e.g. under jitter. Omit ``timestamps`` to fall
+        back to nominal timestamps from `sampling_frequency`.
+
+    Returns
+    -------
+    BaseRecording
+        A recording with the fiber-native API mixed in (``color``,
+        ``fiber_ids``, ``get_fluorescence()``, ``get_fiber_times()``, ...).
+
+    Notes
+    -----
+    Built on spikeinterface's own :class:`~spikeinterface.core.NumpyRecording`
+    (multi-segment traces, dtype consistency, ``t_start``) with
+    :class:`FiberPhotometryMixin` mixed in, rather than reimplementing that
+    segment-handling here.
+    """
+    first = traces if isinstance(traces, np.ndarray) else traces[0]
+    if fiber_ids is None:
+        fiber_ids = [f"fiber_{index}" for index in range(first.shape[1])]
+    if not isinstance(traces, np.ndarray):
+        # SI's NumpyRecording requires an actual list, not e.g. a tuple
+        traces = list(traces)
+    num_segments = 1 if isinstance(traces, np.ndarray) else len(traces)
+
+    segments = None
+    t_starts = None
+    if timestamps is not None:
+        segments = _timestamps_per_segment(timestamps, num_segments)
+        t_starts = [_segment_t_start(times) for times in segments]
+
+    recording = _FiberNumpyRecording(
+        traces_list=traces,
+        sampling_frequency=sampling_frequency,
+        t_starts=t_starts,
+        channel_ids=list(fiber_ids),
+    )
+    recording.annotate(color=color)
+
+    if segments is not None:
+        for segment_index, times in enumerate(segments):
+            recording.set_times(times, segment_index=segment_index)
+
+    return recording
 
 
 class FiberPhotometryRecordingGroup:
