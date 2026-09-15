@@ -21,9 +21,9 @@ from fiber_mosaic.core.base import (
 from fiber_mosaic.processing import (
     bandpass_filter,
     highpass_filter,
-    port_from_si,
     scale,
 )
+from fiber_mosaic.processing.from_si import port_from_si
 from fiber_mosaic.processing.baseprocessor import (
     BaseFiberPhotometryPreprocessor,
     BaseFiberPhotometryPreprocessorSegment,
