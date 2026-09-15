@@ -5,11 +5,11 @@ from __future__ import annotations
 import numpy as np
 
 from fiber_mosaic.core.base import (
-    BaseFiberPhotometryExtractor,
+    FiberPhotometryMixin,
     FiberPhotometryRecordingGroup,
+    recording_from_traces,
 )
 from fiber_mosaic.synthetic import (
-    recording_from_traces,
     simulate_bands,
     simulate_group,
 )
@@ -63,7 +63,7 @@ def test_simulate_group_and_recording_from_traces():
     assert group.get_num_fibers() == _NUM_FIBERS
     assert calcium.shape == (_NUM_SAMPLES, _NUM_FIBERS)
     green = group["green"]
-    assert isinstance(green, BaseFiberPhotometryExtractor)
+    assert isinstance(green, FiberPhotometryMixin)
     assert green.color == "green"
     assert green.get_num_samples() == _NUM_SAMPLES
 

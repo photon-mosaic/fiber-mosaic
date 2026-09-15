@@ -6,6 +6,10 @@ This module provides the base classes that form the foundation of fiber-mosaic:
 - FiberPhotometryMixin: The fiber-native API, mixable into any SI recording
 - BaseFiberPhotometryExtractor: A per-color recording (wraps SI BaseRecording)
 - FiberPhotometryRecordingGroup: A container for multiple colors sharing fibers
+- recording_from_traces: General-purpose constructor for wrapping plain numpy
+  arrays as a fiber-native recording (mixes FiberPhotometryMixin into SI's
+  own NumpyRecording -- used by :mod:`fiber_mosaic.synthetic` but not
+  specific to synthetic data)
 """
 
 from __future__ import annotations
@@ -15,7 +19,10 @@ from collections.abc import Iterable, Sequence
 import numpy as np
 from numpy.typing import ArrayLike
 from spikeinterface.core import BaseRecording
-from spikeinterface.core.numpyextractors import NumpyRecordingSegment
+from spikeinterface.core.numpyextractors import (
+    NumpyRecording,
+    NumpyRecordingSegment,
+)
 
 
 class FiberPhotometryMixin:
@@ -372,6 +379,64 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
         )
         self.add_segment(segment)
         self.set_times(timestamps)
+
+
+class _FiberNumpyRecording(FiberPhotometryMixin, NumpyRecording):
+    """SpikeInterface's ``NumpyRecording`` with the fiber-native API mixed in.
+
+    Not part of the public API -- constructed only by
+    :func:`recording_from_traces`, which also sets the ``color`` annotation.
+    """
+
+
+def recording_from_traces(
+    traces: np.ndarray | Sequence[np.ndarray],
+    color: str,
+    sampling_frequency: float = 30.0,
+    fiber_ids: Sequence | None = None,
+) -> BaseRecording:
+    """Wrap traces arrays as a fiber photometry recording.
+
+    A general-purpose constructor for building a fiber-native recording
+    straight from in-memory arrays -- useful for synthetic data, quick
+    scripts, or any source without a dedicated file-reading subclass.
+
+    Parameters
+    ----------
+    traces : np.ndarray or sequence of np.ndarray
+        One ``(num_samples, num_fibers)`` array for a single segment, or one
+        array per segment.
+    color : str
+        Band label, e.g. ``"green"`` or ``"iso"``.
+    sampling_frequency : float, default: 30.0
+        Acquisition rate in Hz.
+    fiber_ids : sequence or None, default: None
+        Fiber IDs; defaults to ``"fiber_0" ... "fiber_n"``.
+
+    Returns
+    -------
+    BaseRecording
+        A recording with the fiber-native API mixed in (``color``,
+        ``fiber_ids``, ``get_fluorescence()``, ``get_fiber_times()``, ...).
+
+    Notes
+    -----
+    Built on spikeinterface's own :class:`~spikeinterface.core.NumpyRecording`
+    (multi-segment traces, dtype consistency, ``t_start``) with
+    :class:`FiberPhotometryMixin` mixed in, rather than reimplementing that
+    segment-handling here.
+    """
+    first = traces if isinstance(traces, np.ndarray) else traces[0]
+    if fiber_ids is None:
+        fiber_ids = [f"fiber_{index}" for index in range(first.shape[1])]
+
+    recording = _FiberNumpyRecording(
+        traces_list=traces,
+        sampling_frequency=sampling_frequency,
+        channel_ids=list(fiber_ids),
+    )
+    recording.annotate(color=color)
+    return recording
 
 
 class FiberPhotometryRecordingGroup:
