@@ -392,17 +392,21 @@ class _FiberNumpyRecording(FiberPhotometryMixin, NumpyRecording):
 def _segment_t_start(times: np.ndarray) -> float:
     """First-sample time as a scalar, for SI's per-segment ``t_start``.
 
-    ``times`` may be 1-D or 2-D (one column per fiber); for 2-D, fiber 0's
-    first sample stands in for the segment's start -- ``t_start`` is a
-    single SI-level scalar and can't carry per-fiber jitter anyway. Empty
-    ``times`` (an empty segment) falls back to 0.0, matching the existing
-    extractor path (:meth:`FiberPhotometryMixin.set_times`'s callers via
-    ``_add_numpy_segment``).
+    Handles only the 1-D and 2-D shapes ``set_times`` itself supports (for
+    2-D, one column per fiber -- fiber 0's first sample stands in for the
+    segment's start, since ``t_start`` is a single SI-level scalar and
+    can't carry per-fiber jitter anyway) and returns 0.0 for an empty
+    segment. Any other shape also returns 0.0 rather than indexing into it
+    -- it's left for ``set_times`` (called right after construction, with
+    the same ``times``) to reject with its own clear dimension error.
     """
-    if times.size == 0:
+    if times.ndim == 1:
+        first_column = times
+    elif times.ndim == 2:
+        first_column = times[:, 0]
+    else:
         return 0.0
-    first_column = times if times.ndim == 1 else times[:, 0]
-    return float(first_column[0])
+    return float(first_column[0]) if first_column.size else 0.0
 
 
 def _timestamps_per_segment(

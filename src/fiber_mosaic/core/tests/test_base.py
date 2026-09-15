@@ -473,6 +473,17 @@ def test_recording_from_traces_empty_timestamps_raises_cleanly():
         recording_from_traces(traces, color="green", timestamps=np.array([]))
 
 
+def test_recording_from_traces_3d_timestamps_raises_cleanly():
+    """A malformed (3-D) ``timestamps`` raises ``set_times``'s own
+    dimension error, not an ``IndexError``/``TypeError`` from computing
+    ``t_start``."""
+    traces = np.ones((5, 2), dtype="float32")
+    times = np.zeros((5, 2, 1))
+
+    with pytest.raises(ValueError, match="1D or 2D"):
+        recording_from_traces(traces, color="green", timestamps=times)
+
+
 # ---------------- FiberPhotometryRecordingGroup ----------------
 
 
