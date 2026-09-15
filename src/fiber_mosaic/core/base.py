@@ -394,8 +394,13 @@ def _segment_t_start(times: np.ndarray) -> float:
 
     ``times`` may be 1-D or 2-D (one column per fiber); for 2-D, fiber 0's
     first sample stands in for the segment's start -- ``t_start`` is a
-    single SI-level scalar and can't carry per-fiber jitter anyway.
+    single SI-level scalar and can't carry per-fiber jitter anyway. Empty
+    ``times`` (an empty segment) falls back to 0.0, matching the existing
+    extractor path (:meth:`FiberPhotometryMixin.set_times`'s callers via
+    ``_add_numpy_segment``).
     """
+    if times.size == 0:
+        return 0.0
     first_column = times if times.ndim == 1 else times[:, 0]
     return float(first_column[0])
 
@@ -405,26 +410,17 @@ def _timestamps_per_segment(
 ) -> list[np.ndarray]:
     """Split ``timestamps`` into one array per segment.
 
-    A bare array-like is one segment's timestamps; a sequence of array-likes
-    is one per segment. The two are told apart by whether the sequence's own
-    elements are themselves array-like -- so a single segment may be passed
-    as a plain list, not just an ``np.ndarray`` -- except a 2-D single
-    segment given as nested lists rather than an ``np.ndarray``, which reads
-    as one array per row; wrap it in ``np.asarray`` first to disambiguate.
+    With a single segment, ``timestamps`` is that segment's own array-like
+    (1-D or 2-D, plain list or ``np.ndarray``) taken as a whole -- not split
+    apart. With more than one, it's a sequence with one array-like per
+    segment. Deciding from ``num_segments`` rather than sniffing
+    ``timestamps``' own shape is what lets a single 2-D segment be passed as
+    nested lists without misreading it as one 1-D segment per row.
     """
-    if isinstance(timestamps, np.ndarray):
-        segments = [timestamps]
+    if num_segments == 1:
+        segments = [np.asarray(timestamps)]
     else:
-        timestamps = list(timestamps)
-        first_element = timestamps[0] if timestamps else None
-        is_single_segment = not isinstance(
-            first_element, (np.ndarray, list, tuple)
-        )
-        segments = (
-            [np.asarray(timestamps)]
-            if is_single_segment
-            else [np.asarray(times) for times in timestamps]
-        )
+        segments = [np.asarray(times) for times in timestamps]
 
     if len(segments) != num_segments:
         raise ValueError(
@@ -468,10 +464,11 @@ def recording_from_traces(
         per fiber); raises :exc:`ValueError` if the number of arrays
         doesn't match ``traces``' segment count. Each segment's first
         sample also becomes that segment's SI ``t_start``, so SI's own
-        ``get_times()`` agrees with
-        :meth:`~FiberPhotometryMixin.get_fiber_times` rather than staying
-        nominal-from-zero. Omit to fall back to nominal timestamps from
-        `sampling_frequency`.
+        (nominal, evenly-spaced) ``get_times()`` at least starts at the
+        right time instead of at zero; only
+        :meth:`~FiberPhotometryMixin.get_fiber_times` reflects the exact
+        supplied timestamps, e.g. under jitter. Omit ``timestamps`` to fall
+        back to nominal timestamps from `sampling_frequency`.
 
     Returns
     -------

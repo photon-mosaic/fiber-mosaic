@@ -407,8 +407,8 @@ def test_recording_from_traces_with_per_segment_timestamps():
 def test_recording_from_traces_sets_si_t_start():
     """Real ``timestamps`` also set SI's own per-segment ``t_start``.
 
-    So ``get_times()`` (the plain SI API) agrees with ``get_fiber_times()``
-    (the fiber-native API) instead of staying nominal-from-zero.
+    So ``get_times()`` (the plain, nominal SI API) at least starts at the
+    right time instead of at zero.
     """
     traces = [np.ones((5, 2)), np.zeros((4, 2))]
     times = [np.linspace(1.0, 1.04, 5), np.linspace(2.0, 2.03, 4)]
@@ -448,6 +448,29 @@ def test_recording_from_traces_timestamps_segment_count_mismatch():
 
     with pytest.raises(ValueError, match="one array per segment"):
         recording_from_traces(traces, color="red", timestamps=times)
+
+
+def test_recording_from_traces_with_nested_list_2d_timestamps():
+    """A single 2-D segment as nested lists isn't split into per-row
+    segments -- ``num_segments`` (from ``traces``), not ``timestamps``'
+    own shape, decides how it's read."""
+    traces = np.ones((3, 2), dtype="float32")
+    times = [[0.0, 0.001], [0.01, 0.011], [0.02, 0.021]]
+
+    rec = recording_from_traces(traces, color="green", timestamps=times)
+
+    assert rec.get_num_segments() == 1
+    np.testing.assert_allclose(rec.get_fiber_times(), times)
+
+
+def test_recording_from_traces_empty_timestamps_raises_cleanly():
+    """Empty ``timestamps`` for a non-empty segment raises a clear
+    length-mismatch error from ``set_times``, not a raw ``IndexError``
+    from the ``t_start`` computation."""
+    traces = np.ones((5, 2), dtype="float32")
+
+    with pytest.raises(ValueError, match="must match"):
+        recording_from_traces(traces, color="green", timestamps=np.array([]))
 
 
 # ---------------- FiberPhotometryRecordingGroup ----------------
