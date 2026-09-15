@@ -389,8 +389,19 @@ class _FiberNumpyRecording(FiberPhotometryMixin, NumpyRecording):
     """
 
 
+def _segment_t_start(times: np.ndarray) -> float:
+    """First-sample time as a scalar, for SI's per-segment ``t_start``.
+
+    ``times`` may be 1-D or 2-D (one column per fiber); for 2-D, fiber 0's
+    first sample stands in for the segment's start -- ``t_start`` is a
+    single SI-level scalar and can't carry per-fiber jitter anyway.
+    """
+    first_column = times if times.ndim == 1 else times[:, 0]
+    return float(first_column[0])
+
+
 def _timestamps_per_segment(
-    timestamps: np.ndarray | Sequence[ArrayLike], num_segments: int
+    timestamps: ArrayLike | Sequence[ArrayLike], num_segments: int
 ) -> list[np.ndarray]:
     """Split ``timestamps`` into one array per segment.
 
@@ -428,7 +439,7 @@ def recording_from_traces(
     color: str,
     sampling_frequency: float = 30.0,
     fiber_ids: Sequence | None = None,
-    timestamps: np.ndarray | Sequence[np.ndarray] | None = None,
+    timestamps: ArrayLike | Sequence[ArrayLike] | None = None,
 ) -> BaseRecording:
     """Wrap traces arrays as a fiber photometry recording.
 
@@ -455,8 +466,12 @@ def recording_from_traces(
         is fine too). Passed to :meth:`~FiberPhotometryMixin.set_times`, so
         each array may be 1-D (broadcast to all fibers) or 2-D (one column
         per fiber); raises :exc:`ValueError` if the number of arrays
-        doesn't match ``traces``' segment count. Omit to fall back to
-        nominal timestamps from `sampling_frequency`.
+        doesn't match ``traces``' segment count. Each segment's first
+        sample also becomes that segment's SI ``t_start``, so SI's own
+        ``get_times()`` agrees with
+        :meth:`~FiberPhotometryMixin.get_fiber_times` rather than staying
+        nominal-from-zero. Omit to fall back to nominal timestamps from
+        `sampling_frequency`.
 
     Returns
     -------
@@ -477,18 +492,23 @@ def recording_from_traces(
     if not isinstance(traces, np.ndarray):
         # SI's NumpyRecording requires an actual list, not e.g. a tuple
         traces = list(traces)
+    num_segments = 1 if isinstance(traces, np.ndarray) else len(traces)
+
+    segments = None
+    t_starts = None
+    if timestamps is not None:
+        segments = _timestamps_per_segment(timestamps, num_segments)
+        t_starts = [_segment_t_start(times) for times in segments]
 
     recording = _FiberNumpyRecording(
         traces_list=traces,
         sampling_frequency=sampling_frequency,
+        t_starts=t_starts,
         channel_ids=list(fiber_ids),
     )
     recording.annotate(color=color)
 
-    if timestamps is not None:
-        segments = _timestamps_per_segment(
-            timestamps, recording.get_num_segments()
-        )
+    if segments is not None:
         for segment_index, times in enumerate(segments):
             recording.set_times(times, segment_index=segment_index)
 

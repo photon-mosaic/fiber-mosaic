@@ -404,6 +404,21 @@ def test_recording_from_traces_with_per_segment_timestamps():
     )
 
 
+def test_recording_from_traces_sets_si_t_start():
+    """Real ``timestamps`` also set SI's own per-segment ``t_start``.
+
+    So ``get_times()`` (the plain SI API) agrees with ``get_fiber_times()``
+    (the fiber-native API) instead of staying nominal-from-zero.
+    """
+    traces = [np.ones((5, 2)), np.zeros((4, 2))]
+    times = [np.linspace(1.0, 1.04, 5), np.linspace(2.0, 2.03, 4)]
+
+    rec = recording_from_traces(traces, color="red", timestamps=times)
+
+    np.testing.assert_allclose(rec.get_times(segment_index=0)[0], times[0][0])
+    np.testing.assert_allclose(rec.get_times(segment_index=1)[0], times[1][0])
+
+
 def test_recording_from_traces_with_tuple_traces():
     """A tuple of per-segment arrays works, not just a list."""
     traces = (np.ones((5, 2)), np.zeros((4, 2)))
