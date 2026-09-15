@@ -389,6 +389,40 @@ class _FiberNumpyRecording(FiberPhotometryMixin, NumpyRecording):
     """
 
 
+def _timestamps_per_segment(
+    timestamps: np.ndarray | Sequence[ArrayLike], num_segments: int
+) -> list[np.ndarray]:
+    """Split ``timestamps`` into one array per segment.
+
+    A bare array-like is one segment's timestamps; a sequence of array-likes
+    is one per segment. The two are told apart by whether the sequence's own
+    elements are themselves array-like -- so a single segment may be passed
+    as a plain list, not just an ``np.ndarray`` -- except a 2-D single
+    segment given as nested lists rather than an ``np.ndarray``, which reads
+    as one array per row; wrap it in ``np.asarray`` first to disambiguate.
+    """
+    if isinstance(timestamps, np.ndarray):
+        segments = [timestamps]
+    else:
+        timestamps = list(timestamps)
+        first_element = timestamps[0] if timestamps else None
+        is_single_segment = not isinstance(
+            first_element, (np.ndarray, list, tuple)
+        )
+        segments = (
+            [np.asarray(timestamps)]
+            if is_single_segment
+            else [np.asarray(times) for times in timestamps]
+        )
+
+    if len(segments) != num_segments:
+        raise ValueError(
+            "timestamps must provide one array per segment "
+            f"({num_segments} segments, got {len(segments)})"
+        )
+    return segments
+
+
 def recording_from_traces(
     traces: np.ndarray | Sequence[np.ndarray],
     color: str,
@@ -417,10 +451,12 @@ def recording_from_traces(
         Fiber IDs; defaults to ``"fiber_0" ... "fiber_n"``.
     timestamps : array-like or sequence of array-like, optional
         Real per-sample timestamps, one array per segment matching
-        ``traces`` (a bare array for a single segment). Passed to
-        :meth:`~FiberPhotometryMixin.set_times`, so each array may be 1-D
-        (broadcast to all fibers) or 2-D (one column per fiber). Omit to
-        fall back to nominal timestamps from `sampling_frequency`.
+        ``traces`` (a bare array-like for a single segment -- a plain list
+        is fine too). Passed to :meth:`~FiberPhotometryMixin.set_times`, so
+        each array may be 1-D (broadcast to all fibers) or 2-D (one column
+        per fiber); raises :exc:`ValueError` if the number of arrays
+        doesn't match ``traces``' segment count. Omit to fall back to
+        nominal timestamps from `sampling_frequency`.
 
     Returns
     -------
@@ -438,6 +474,9 @@ def recording_from_traces(
     first = traces if isinstance(traces, np.ndarray) else traces[0]
     if fiber_ids is None:
         fiber_ids = [f"fiber_{index}" for index in range(first.shape[1])]
+    if not isinstance(traces, np.ndarray):
+        # SI's NumpyRecording requires an actual list, not e.g. a tuple
+        traces = list(traces)
 
     recording = _FiberNumpyRecording(
         traces_list=traces,
@@ -447,10 +486,8 @@ def recording_from_traces(
     recording.annotate(color=color)
 
     if timestamps is not None:
-        segments = (
-            [timestamps]
-            if isinstance(timestamps, np.ndarray)
-            else list(timestamps)
+        segments = _timestamps_per_segment(
+            timestamps, recording.get_num_segments()
         )
         for segment_index, times in enumerate(segments):
             recording.set_times(times, segment_index=segment_index)

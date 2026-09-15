@@ -404,6 +404,37 @@ def test_recording_from_traces_with_per_segment_timestamps():
     )
 
 
+def test_recording_from_traces_with_tuple_traces():
+    """A tuple of per-segment arrays works, not just a list."""
+    traces = (np.ones((5, 2)), np.zeros((4, 2)))
+
+    rec = recording_from_traces(traces, color="red")
+
+    assert rec.get_num_segments() == 2
+    assert rec.get_num_samples(1) == 4
+
+
+def test_recording_from_traces_with_plain_list_timestamps():
+    """A plain list (not ``np.ndarray``) is one segment's timestamps."""
+    traces = np.ones((5, 2), dtype="float32")
+    times = [0.0, 0.01, 0.02, 0.03, 0.04]
+
+    rec = recording_from_traces(traces, color="green", timestamps=times)
+
+    assert rec.has_fiber_times()
+    np.testing.assert_allclose(rec.get_fiber_times()[:, 0], times)
+
+
+def test_recording_from_traces_timestamps_segment_count_mismatch():
+    """Too few/many ``timestamps`` arrays raises rather than silently
+    leaving segments on nominal times."""
+    traces = [np.ones((5, 2)), np.zeros((4, 2))]
+    times = [np.linspace(0.0, 0.04, 5)]  # only 1 array for 2 segments
+
+    with pytest.raises(ValueError, match="one array per segment"):
+        recording_from_traces(traces, color="red", timestamps=times)
+
+
 # ---------------- FiberPhotometryRecordingGroup ----------------
 
 
