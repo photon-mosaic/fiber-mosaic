@@ -378,12 +378,20 @@ def test_recording_from_traces_without_timestamps():
     assert not rec.has_fiber_times()
 
 
-def test_recording_from_traces_with_1d_timestamps():
-    """A bare 1-D ``timestamps`` array sets real times, single segment."""
+@pytest.mark.parametrize(
+    "as_type",
+    [np.asarray, list],
+    ids=["ndarray", "plain_list"],
+)
+def test_recording_from_traces_with_1d_timestamps(as_type):
+    """A bare 1-D ``timestamps`` sets real times, single segment --
+    whether given as an ``np.ndarray`` or a plain list."""
     traces = np.ones((10, 2), dtype="float32")
     times = np.linspace(0.0, 0.09, 10) + 0.001  # jittery, not nominal
 
-    rec = recording_from_traces(traces, color="green", timestamps=times)
+    rec = recording_from_traces(
+        traces, color="green", timestamps=as_type(times)
+    )
 
     assert rec.has_fiber_times()
     np.testing.assert_allclose(rec.get_fiber_times()[:, 0], times)
@@ -419,25 +427,15 @@ def test_recording_from_traces_sets_si_t_start():
     np.testing.assert_allclose(rec.get_times(segment_index=1)[0], times[1][0])
 
 
-def test_recording_from_traces_with_tuple_traces():
-    """A tuple of per-segment arrays works, not just a list."""
-    traces = (np.ones((5, 2)), np.zeros((4, 2)))
+@pytest.mark.parametrize("container", [list, tuple])
+def test_recording_from_traces_with_sequence_traces(container):
+    """A sequence of per-segment arrays works as a list or a tuple."""
+    traces = container([np.ones((5, 2)), np.zeros((4, 2))])
 
     rec = recording_from_traces(traces, color="red")
 
     assert rec.get_num_segments() == 2
     assert rec.get_num_samples(1) == 4
-
-
-def test_recording_from_traces_with_plain_list_timestamps():
-    """A plain list (not ``np.ndarray``) is one segment's timestamps."""
-    traces = np.ones((5, 2), dtype="float32")
-    times = [0.0, 0.01, 0.02, 0.03, 0.04]
-
-    rec = recording_from_traces(traces, color="green", timestamps=times)
-
-    assert rec.has_fiber_times()
-    np.testing.assert_allclose(rec.get_fiber_times()[:, 0], times)
 
 
 def test_recording_from_traces_timestamps_segment_count_mismatch():
