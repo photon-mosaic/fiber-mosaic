@@ -3,6 +3,7 @@ Core classes for fiber photometry data handling.
 
 This module provides the base classes that form the foundation of fiber-mosaic:
 
+- FiberPhotometryMixin: The fiber-native API, mixable into any SI recording
 - BaseFiberPhotometryExtractor: A per-color recording (wraps SI BaseRecording)
 - FiberPhotometryRecordingGroup: A container for multiple colors sharing fibers
 """
@@ -17,62 +18,42 @@ from spikeinterface.core import BaseRecording
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 
-class BaseFiberPhotometryExtractor(BaseRecording):
+class FiberPhotometryMixin:
     """
-    Base class for fiber photometry recordings.
+    Fiber-native API for fiber photometry recordings.
 
-    This class represents a single-color recording from a fiber photometry
-    experiment. It wraps SpikeInterface's BaseRecording and provides
-    fiber-photometry-specific vocabulary and methods:
+    Provides fiber-photometry vocabulary and per-fiber timestamps on top of
+    a SpikeInterface recording:
 
     - Channels are called "fibers"
     - `get_fluorescence()` wraps `get_traces()` with fiber-native naming
     - Per-fiber timestamps via `set_times()` and `get_fiber_times()`
-    - `get_streams()` for format-specific discovery of available data streams
 
-    Each color in an experiment should be its own BaseFiberPhotometryExtractor
-    instance, grouped together via FiberPhotometryRecordingGroup.
+    This is deliberately separate from BaseFiberPhotometryExtractor, which
+    adds the source-side concerns (construction, stream discovery, segment
+    loading). Keeping the API in a mixin lets recording-to-recording classes
+    -- notably SpikeInterface preprocessors, which cannot inherit from an
+    extractor -- expose the same fiber-native surface.
 
-    Parameters
-    ----------
-    sampling_frequency : float
-        The nominal sampling frequency in Hz.
-    fiber_ids : list or array-like
-        Identifiers for each fiber (will be used as channel_ids internally).
-    color : str
-        The color/wavelength identifier for this recording
-        (e.g., "green", "red", "iso").
-    dtype : dtype, optional
-        The data type of the traces. Default is float64.
+    Notes
+    -----
+    Must be mixed into a SpikeInterface ``BaseRecording``, on whose
+    ``get_channel_ids``, ``get_num_channels``, ``get_num_samples``,
+    ``get_num_segments``, ``get_traces``, ``get_times``,
+    ``get_sampling_frequency``, ``get_dtype``, ``ids_to_indices``,
+    ``get_annotation``, ``_check_segment_index`` and ``_recording_segments``
+    it relies. It defines no ``__init__``, so it never interferes with the
+    host class's construction.
+
+    The color is read from the ``"color"`` annotation rather than from an
+    attribute, because ``copy_metadata`` propagates annotations but not
+    attributes -- so the color survives SpikeInterface preprocessing steps.
     """
-
-    def __init__(
-        self,
-        sampling_frequency: float,
-        fiber_ids: Sequence,
-        color: str,
-        dtype: np.dtype = np.float64,
-    ):
-        # Pass fiber_ids as channel_ids to SI's BaseRecording
-        BaseRecording.__init__(
-            self,
-            sampling_frequency=sampling_frequency,
-            channel_ids=list(fiber_ids),
-            dtype=dtype,
-        )
-        self._color = color
-        # Store kwargs for serialization
-        self._kwargs = {
-            "sampling_frequency": sampling_frequency,
-            "fiber_ids": list(fiber_ids),
-            "color": color,
-            "dtype": str(dtype),
-        }
 
     @property
     def color(self) -> str:
         """Return the color/wavelength identifier for this recording."""
-        return self._color
+        return self.get_annotation("color")
 
     @property
     def fiber_ids(self) -> np.ndarray:
@@ -261,6 +242,70 @@ class BaseFiberPhotometryExtractor(BaseRecording):
                 times_1d[:, np.newaxis], (len(times_1d), n_fibers)
             ).copy()
 
+    def __repr__(self) -> str:
+        """Return a one-line summary: class, color, fiber/segment count."""
+        n_seg = self.get_num_segments()
+        n_fib = self.get_num_fibers()
+        sf = self.get_sampling_frequency()
+        dtype = self.get_dtype()
+        return (
+            f"{self.__class__.__name__} | color={self.color} | "
+            f"{n_fib} fiber(s) | {n_seg} segment(s) | "
+            f"{sf:.1f} Hz | dtype: {dtype}"
+        )
+
+
+class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
+    """
+    Base class for fiber photometry recordings.
+
+    This class represents a single-color recording from a fiber photometry
+    experiment. It wraps SpikeInterface's BaseRecording, takes its
+    fiber-native API from FiberPhotometryMixin, and adds the source-side
+    concerns: construction, `get_streams()` for format-specific discovery of
+    available data streams, and segment loading.
+
+    Each color in an experiment should be its own BaseFiberPhotometryExtractor
+    instance, grouped together via FiberPhotometryRecordingGroup.
+
+    Parameters
+    ----------
+    sampling_frequency : float
+        The nominal sampling frequency in Hz.
+    fiber_ids : list or array-like
+        Identifiers for each fiber (will be used as channel_ids internally).
+    color : str
+        The color/wavelength identifier for this recording
+        (e.g., "green", "red", "iso").
+    dtype : dtype, optional
+        The data type of the traces. Default is float64.
+    """
+
+    def __init__(
+        self,
+        sampling_frequency: float,
+        fiber_ids: Sequence,
+        color: str,
+        dtype: np.dtype = np.float64,
+    ):
+        # Pass fiber_ids as channel_ids to SI's BaseRecording
+        BaseRecording.__init__(
+            self,
+            sampling_frequency=sampling_frequency,
+            channel_ids=list(fiber_ids),
+            dtype=dtype,
+        )
+        # Store the color as an annotation, not an attribute, so that
+        # copy_metadata carries it across SpikeInterface preprocessing steps.
+        self.annotate(color=color)
+        # Store kwargs for serialization
+        self._kwargs = {
+            "sampling_frequency": sampling_frequency,
+            "fiber_ids": list(fiber_ids),
+            "color": color,
+            "dtype": str(dtype),
+        }
+
     @classmethod
     def get_streams(
         cls, file_path: str, **kwargs
@@ -327,33 +372,6 @@ class BaseFiberPhotometryExtractor(BaseRecording):
         )
         self.add_segment(segment)
         self.set_times(timestamps)
-
-    def add_segment(self, segment) -> None:
-        """
-        Add a segment to this recording.
-
-        This is a thin wrapper around BaseExtractor.add_segment for API
-        consistency.
-
-        Parameters
-        ----------
-        segment : BaseRecordingSegment
-            The segment to add.
-        """
-        self._recording_segments.append(segment)
-        segment.set_parent_extractor(self)
-
-    def __repr__(self) -> str:
-        """Return a one-line summary: class, color, fiber/segment count."""
-        n_seg = self.get_num_segments()
-        n_fib = self.get_num_fibers()
-        sf = self.get_sampling_frequency()
-        dtype = self.get_dtype()
-        return (
-            f"{self.__class__.__name__} | color={self.color} | "
-            f"{n_fib} fiber(s) | {n_seg} segment(s) | "
-            f"{sf:.1f} Hz | dtype: {dtype}"
-        )
 
 
 class FiberPhotometryRecordingGroup:
