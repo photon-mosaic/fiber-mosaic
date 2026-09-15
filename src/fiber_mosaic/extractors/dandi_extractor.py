@@ -1,0 +1,475 @@
+"""
+DANDI Archive streaming extractor for fiber photometry data.
+
+Streams NWB fiber photometry data directly from the DANDI Archive without
+downloading the entire file.
+"""
+
+from __future__ import annotations
+
+import logging
+
+import numpy as np
+from spikeinterface.core import BaseRecordingSegment
+
+from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
+from fiber_mosaic.extractors.nwb_extractor import (
+    _discover_fiber_photometry_series,
+    _resolve_timing,
+)
+
+logger = logging.getLogger(__name__)
+
+DANDI_URI_PREFIX = "dandi://"
+
+
+def is_dandi_uri(path: str) -> bool:
+    """
+    Check whether a path is a DANDI URI.
+
+    Parameters
+    ----------
+    path : str
+        Path to check.
+
+    Returns
+    -------
+    bool
+        True if the path starts with ``dandi://``.
+
+    Examples
+    --------
+    >>> is_dandi_uri("dandi://000971/sub-112/file.nwb")
+    True
+    >>> is_dandi_uri("/local/path/file.nwb")
+    False
+    """
+    return isinstance(path, str) and path.startswith(DANDI_URI_PREFIX)
+
+
+def parse_dandi_uri(uri: str) -> tuple[str, str]:
+    """
+    Parse a DANDI URI into its dandiset ID and asset path.
+
+    Parameters
+    ----------
+    uri : str
+        A DANDI URI of the form ``dandi://DANDISET_ID/asset/path.nwb``.
+
+    Returns
+    -------
+    dandiset_id : str
+        The dandiset identifier (e.g. ``"000971"``).
+    asset_path : str
+        The asset path within the dandiset (e.g. ``"sub-112/file.nwb"``).
+
+    Raises
+    ------
+    ValueError
+        If the URI is not a valid DANDI URI.
+
+    Examples
+    --------
+    >>> dandiset_id, asset_path = parse_dandi_uri("dandi://000971/sub-112/file.nwb")
+    >>> dandiset_id
+    '000971'
+    >>> asset_path
+    'sub-112/file.nwb'
+    """
+    if not is_dandi_uri(uri):
+        raise ValueError(f"Not a valid DANDI URI: {uri}")
+
+    stripped = uri[len(DANDI_URI_PREFIX) :]
+    parts = stripped.split("/", 1)
+
+    if len(parts) < 2:
+        raise ValueError(
+            f"Invalid DANDI URI format: {uri}. "
+            "Expected: dandi://DANDISET_ID/asset/path.nwb"
+        )
+
+    dandiset_id = parts[0]
+    asset_path = parts[1]
+    return dandiset_id, asset_path
+
+
+def _check_dandi_dependencies():  # pragma: no cover
+    """Check for required DANDI streaming dependencies."""
+    missing = []
+
+    try:
+        import dandi  # noqa: F401
+    except ImportError:
+        missing.append("dandi")
+
+    try:
+        import remfile  # noqa: F401
+    except ImportError:
+        missing.append("remfile")
+
+    try:
+        import h5py  # noqa: F401
+    except ImportError:
+        missing.append("h5py")
+
+    try:
+        from pynwb import NWBHDF5IO  # noqa: F401
+    except ImportError:
+        missing.append("pynwb")
+
+    if missing:
+        raise ImportError(
+            f"Missing dependencies for DANDI streaming: {missing}. "
+            f"Install with: pip install {' '.join(missing)}"
+        )
+
+
+def _stream_nwb(dandiset_id: str, asset_path: str):  # pragma: no cover
+    """
+    Open a streaming connection to an NWB file on the DANDI Archive.
+
+    Parameters
+    ----------
+    dandiset_id : str
+        Dandiset ID.
+    asset_path : str
+        Path to the NWB file within the dandiset.
+
+    Returns
+    -------
+    nwbfile : pynwb.NWBFile
+        The opened NWB file.
+    io : pynwb.NWBHDF5IO
+        The IO object (must be closed when done).
+    """
+    import h5py
+    import remfile
+    from dandi.dandiapi import DandiAPIClient
+    from pynwb import NWBHDF5IO
+
+    with DandiAPIClient() as client:
+        # Try to authenticate but don't fail if not possible
+        try:
+            client.dandi_authenticate()
+        except Exception:
+            logger.debug(
+                "DANDI authentication failed, proceeding without auth"
+            )
+
+        dandiset = client.get_dandiset(dandiset_id, "draft")
+        asset = dandiset.get_asset_by_path(asset_path)
+        s3_url = asset.get_content_url(follow_redirects=1, strip_query=False)
+
+    # Open remote file
+    file_system = remfile.File(s3_url)
+    h5_file = h5py.File(file_system, mode="r")
+    io = NWBHDF5IO(file=h5_file, load_namespaces=True)
+    nwbfile = io.read()
+
+    return nwbfile, io
+
+
+class DandiRecordingSegment(BaseRecordingSegment):
+    """
+    Recording segment that streams data from DANDI on demand.
+
+    Data is not loaded until :meth:`get_traces` is called, keeping
+    ``__init__`` lightweight even for large remote datasets.
+
+    Parameters
+    ----------
+    dandi_uri : str
+        DANDI URI of the source NWB file.
+    series_name : str
+        Name of the FiberPhotometryResponseSeries to stream.
+    n_samples : int
+        Total number of samples (from ``series.data.shape[0]``).
+    n_channels : int
+        Number of channels (1 for 1-D series, else
+        ``series.data.shape[1]``).
+    dtype : np.dtype
+        Data type (from ``series.data.dtype``).
+    sampling_frequency : float
+        Sampling rate in Hz.
+    t_start : float
+        Start time in seconds.
+    """
+
+    def __init__(
+        self,
+        dandi_uri: str,
+        series_name: str,
+        n_samples: int,
+        n_channels: int,
+        dtype,
+        sampling_frequency: float,
+        t_start: float,
+    ):
+        super().__init__(
+            sampling_frequency=sampling_frequency,
+            t_start=t_start,
+        )
+        self._dandi_uri = dandi_uri
+        self._series_name = series_name
+        self._n_samples = n_samples
+        self._n_channels = n_channels
+        self._dtype = dtype
+
+    def get_num_samples(self) -> int:
+        """Return the number of samples in this segment."""
+        return self._n_samples
+
+    def get_traces(
+        self,
+        start_frame: int | None = None,
+        end_frame: int | None = None,
+        channel_indices=None,
+    ) -> np.ndarray:
+        """
+        Stream a slice of fluorescence data from DANDI.
+
+        Opens a new connection per call; DANDI connections are not
+        meant to be held open across calls.
+
+        Parameters
+        ----------
+        start_frame : int, optional
+            First frame to read (inclusive). Defaults to 0.
+        end_frame : int, optional
+            Last frame to read (exclusive). Defaults to ``n_samples``.
+        channel_indices : array-like, optional
+            Channel indices to return. If None, all channels returned.
+
+        Returns
+        -------
+        np.ndarray
+            Data array of shape ``(n_frames, n_channels)``.
+        """
+        start = 0 if start_frame is None else int(start_frame)
+        end = self._n_samples if end_frame is None else int(end_frame)
+
+        dandiset_id, asset_path = parse_dandi_uri(self._dandi_uri)
+        nwbfile, io = _stream_nwb(dandiset_id, asset_path)
+        try:
+            series_dict = _discover_fiber_photometry_series(nwbfile)
+            series = series_dict[self._series_name]
+            raw = np.array(series.data[start:end])
+        finally:
+            io.close()
+
+        if raw.ndim == 1:
+            raw = raw[:, np.newaxis]
+        if channel_indices is not None:
+            raw = raw[:, channel_indices]
+        return raw.astype(self._dtype)
+
+
+class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
+    """
+    Extractor that streams fiber photometry data from the DANDI Archive.
+
+    Accepts a DANDI URI and streams NWB data directly without downloading
+    the entire file.
+
+    Parameters
+    ----------
+    dandi_uri : str
+        A DANDI URI of the form ``dandi://DANDISET_ID/asset/path.nwb``.
+    series_name : str, optional
+        Name of the FiberPhotometryResponseSeries to read.
+    color : str
+        Color/wavelength identifier (e.g. ``"green"``, ``"415nm"``).
+        Must be provided explicitly; NWB series names encode the
+        experimental signal, not illumination color.
+
+    Examples
+    --------
+    >>> # List available series
+    >>> names, ids = DandiFiberPhotometryExtractor.get_streams(
+    ...     "dandi://000971/sub-112/session.nwb"
+    ... )
+
+    >>> # Read data
+    >>> recording = DandiFiberPhotometryExtractor(
+    ...     "dandi://000971/sub-112/session.nwb",
+    ...     series_name="GCaMP_signal",
+    ...     color="green"
+    ... )
+    """
+
+    def __init__(
+        self,
+        dandi_uri: str,
+        series_name: str | None = None,
+        color: str | None = None,
+    ):
+        _check_dandi_dependencies()
+
+        if not is_dandi_uri(dandi_uri):
+            raise ValueError(f"Not a valid DANDI URI: {dandi_uri}")
+
+        dandiset_id, asset_path = parse_dandi_uri(dandi_uri)
+
+        logger.info("Streaming from DANDI: %s/%s", dandiset_id, asset_path)
+
+        # Read metadata only — bulk trace data is deferred to get_traces()
+        nwbfile, io = _stream_nwb(dandiset_id, asset_path)
+
+        try:
+            series_dict = _discover_fiber_photometry_series(nwbfile)
+
+            if not series_dict:
+                raise ValueError(
+                    f"No FiberPhotometryResponseSeries found in {dandi_uri}"
+                )
+
+            if series_name is None:
+                if len(series_dict) == 1:
+                    series_name = list(series_dict.keys())[0]
+                else:
+                    raise ValueError(
+                        f"Multiple series found: "
+                        f"{list(series_dict.keys())}. "
+                        "Please specify series_name."
+                    )
+
+            if series_name not in series_dict:
+                raise ValueError(
+                    f"Series '{series_name}' not found. "
+                    f"Available: {list(series_dict.keys())}"
+                )
+
+            series = series_dict[series_name]
+
+            # Shape and dtype are HDF5 metadata — no data loaded here
+            data_shape = series.data.shape
+            n_samples = data_shape[0]
+            if len(data_shape) == 1:
+                n_channels = 1
+                fiber_ids = [series_name]
+            else:
+                n_channels = data_shape[1]
+                fiber_ids = [f"{series_name}_{i}" for i in range(n_channels)]
+            dtype = series.data.dtype
+
+            # Timestamps are a lightweight 1-D array; read them now
+            sampling_rate, timestamps = _resolve_timing(series, n_samples)
+
+        finally:
+            io.close()
+
+        if color is None:
+            raise ValueError(
+                "color must be provided explicitly (e.g. color='green'). "
+                "NWB series names encode the experimental signal, "
+                "not illumination color."
+            )
+
+        t_start = float(timestamps[0]) if len(timestamps) > 0 else 0.0
+
+        super().__init__(
+            sampling_frequency=sampling_rate,
+            fiber_ids=fiber_ids,
+            color=color,
+            dtype=dtype,
+        )
+
+        segment = DandiRecordingSegment(
+            dandi_uri=dandi_uri,
+            series_name=series_name,
+            n_samples=n_samples,
+            n_channels=n_channels,
+            dtype=dtype,
+            sampling_frequency=sampling_rate,
+            t_start=t_start,
+        )
+        self.add_segment(segment)
+        self.set_times(timestamps)
+
+        self._kwargs = {
+            "dandi_uri": dandi_uri,
+            "series_name": series_name,
+            "color": color,
+        }
+
+        logger.info(
+            "Loaded DANDI stream %s, series '%s': "
+            "%d fibers, %d samples, %.2f Hz",
+            dandi_uri,
+            series_name,
+            len(fiber_ids),
+            n_samples,
+            sampling_rate,
+        )
+
+    @classmethod
+    def get_streams(cls, dandi_uri: str) -> tuple[list[str], list[str]]:
+        """
+        Discover available FiberPhotometryResponseSeries in a DANDI NWB file.
+
+        Parameters
+        ----------
+        dandi_uri : str
+            A DANDI URI of the form ``dandi://DANDISET_ID/asset/path.nwb``.
+
+        Returns
+        -------
+        stream_names : list of str
+            Names of available series.
+        stream_ids : list of str
+            Same as stream_names.
+        """
+        _check_dandi_dependencies()
+
+        if not is_dandi_uri(dandi_uri):
+            raise ValueError(f"Not a valid DANDI URI: {dandi_uri}")
+
+        dandiset_id, asset_path = parse_dandi_uri(dandi_uri)
+        nwbfile, io = _stream_nwb(dandiset_id, asset_path)
+
+        try:
+            series_dict = _discover_fiber_photometry_series(nwbfile)
+            series_names = list(series_dict.keys())
+        finally:
+            io.close()
+
+        return series_names, series_names
+
+
+def read_dandi_fiber_photometry(
+    dandi_uri: str,
+    series_name: str | None = None,
+    color: str | None = None,
+) -> DandiFiberPhotometryExtractor:
+    """
+    Read fiber photometry data from the DANDI Archive.
+
+    Convenience function that creates a DandiFiberPhotometryExtractor.
+
+    Parameters
+    ----------
+    dandi_uri : str
+        A DANDI URI of the form ``dandi://DANDISET_ID/asset/path.nwb``.
+    series_name : str, optional
+        Name of the FiberPhotometryResponseSeries to read.
+    color : str
+        Color/wavelength identifier.
+
+    Returns
+    -------
+    DandiFiberPhotometryExtractor
+        The loaded recording.
+
+    Examples
+    --------
+    >>> rec = read_dandi_fiber_photometry(
+    ...     "dandi://000971/sub-112/session.nwb",
+    ...     series_name="GCaMP_signal",
+    ...     color="green"
+    ... )
+    """
+    return DandiFiberPhotometryExtractor(
+        dandi_uri=dandi_uri,
+        series_name=series_name,
+        color=color,
+    )
