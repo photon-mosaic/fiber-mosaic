@@ -42,6 +42,10 @@ from fiber_mosaic.processing.from_si import (
     scale,
     zscore,
 )
+from fiber_mosaic.processing.isosbestic_correction import (
+    IsosbesticCorrectionRecording,
+    isosbestic_correction,
+)
 
 _all_processer_dict = {
     # filter stuff
@@ -55,6 +59,8 @@ _all_processer_dict = {
     FiberScaleRecording: scale,
     FiberCenterRecording: center,
     FiberZScoreRecording: zscore,
+    # fiber-mosaic stuff
+    IsosbesticCorrectionRecording: isosbestic_correction,
 }
 # we control import in the preprocessing init by setting an __all__
 
@@ -67,4 +73,4 @@ processor_dict = {
     pp_class.__name__: pp_function
     for pp_class, pp_function in _all_processer_dict.items()
 }
-__all__.append("preprocessor_dict")
+__all__.append("processor_dict")
