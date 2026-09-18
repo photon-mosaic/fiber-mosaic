@@ -305,8 +305,7 @@ def _make_plain_recording(n_samples=10, fiber_ids=("f0", "f1", "f2")):
         sampling_frequency=sampling_frequency,
         t_start=None,
     )
-    rec._recording_segments.append(segment)
-    segment.set_parent_extractor(rec)
+    rec.add_segment(segment)
     return rec, traces
 
 
