@@ -50,8 +50,7 @@ class FiberPreprocessingPipeline(PreprocessingPipeline):
     An ordered list of fiber photometry preprocessing steps.
 
     SpikeInterface's ``PreprocessingPipeline`` with fiber-mosaic's steps, so
-    the result keeps the fiber API, per-fiber timestamps and photometry
-    defaults.
+    the result keeps the fiber API and photometry defaults.
 
     Parameters
     ----------

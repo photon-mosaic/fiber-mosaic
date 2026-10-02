@@ -13,48 +13,19 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 
 import numpy as np
-from numpy.typing import ArrayLike
 from spikeinterface.core import BaseRecording
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
-
-
-def _segment_fiber_times(segment) -> np.ndarray | None:
-    """
-    Return a segment's per-fiber times matrix, or None if it has none.
-
-    Two kinds of segment can answer. Source segments carry the matrix
-    directly, as written by :meth:`FiberPhotometryMixin.set_times`. Fiber
-    preprocessor segments expose ``get_fiber_times()`` instead and inherit
-    from their own parent segment, so a chain of preprocessors resolves
-    without copying anything.
-
-    Parameters
-    ----------
-    segment : BaseRecordingSegment
-        The segment to read.
-
-    Returns
-    -------
-    np.ndarray or None
-        Times of shape ``(n_samples, n_fibers)``, or None when this segment
-        has no per-fiber times.
-    """
-    getter = getattr(segment, "get_fiber_times", None)
-    if getter is not None:
-        return getter()
-    return getattr(segment, "fiber_time_vectors", None)
 
 
 class FiberPhotometryMixin:
     """
     Fiber-native API for fiber photometry recordings.
 
-    Provides fiber-photometry vocabulary and per-fiber timestamps on top of
-    a SpikeInterface recording:
+    Provides fiber-photometry vocabulary on top of a SpikeInterface
+    recording:
 
     - Channels are called "fibers"
     - `get_fluorescence()` wraps `get_traces()` with fiber-native naming
-    - Per-fiber timestamps via `set_times()` and `get_fiber_times()`
 
     This is deliberately separate from BaseFiberPhotometryExtractor, which
     adds the source-side concerns (construction, stream discovery, segment
@@ -65,11 +36,9 @@ class FiberPhotometryMixin:
     Notes
     -----
     Must be mixed into a SpikeInterface ``BaseRecording``, on whose
-    ``get_channel_ids``, ``get_num_channels``, ``get_num_samples``,
-    ``get_num_segments``, ``get_traces``, ``get_times``,
-    ``get_sampling_frequency``, ``get_dtype``, ``ids_to_indices``,
-    ``get_annotation``, ``get_parent``, ``_check_segment_index`` and
-    ``segments`` it relies. It defines no ``__init__``, so it never
+    ``get_channel_ids``, ``get_num_channels``, ``get_num_segments``,
+    ``get_traces``, ``get_sampling_frequency``, ``get_dtype`` and
+    ``get_annotation`` it relies. It defines no ``__init__``, so it never
     interferes with the host class's construction.
 
     The color is read from the ``"color"`` annotation rather than from an
@@ -132,189 +101,6 @@ class FiberPhotometryMixin:
             end_frame=end_frame,
             channel_ids=fiber_ids,
         )
-
-    def set_times(
-        self,
-        times: ArrayLike,
-        segment_index: int | None = None,
-    ) -> None:
-        """
-        Set per-fiber timestamps for this recording.
-
-        Unlike SpikeInterface's set_times (which sets a single shared time
-        vector), this method supports per-fiber timestamps stored as a 2D
-        array.
-
-        Parameters
-        ----------
-        times : array-like
-            Time values in seconds. Can be:
-            - 1D array of shape (n_samples,): broadcast to all fibers
-            - 2D array of shape (n_samples, n_fibers): one column per fiber
-        segment_index : int, optional
-            The segment index. If None and only one segment exists,
-            defaults to 0.
-        """
-        segment_index = self._check_segment_index(segment_index)
-        rs = self.segments[segment_index]
-
-        times = np.asarray(times)
-        n_samples = self.get_num_samples(segment_index)
-        n_fibers = self.get_num_fibers()
-
-        # Validate and reshape times
-        if times.ndim == 1:
-            if len(times) != n_samples:
-                raise ValueError(
-                    f"1D times array length ({len(times)}) must match "
-                    f"number of samples ({n_samples})"
-                )
-            # Broadcast 1D to 2D (n_samples, n_fibers)
-            broadcast_shape = (n_samples, n_fibers)
-            times = np.broadcast_to(
-                times[:, np.newaxis], broadcast_shape
-            ).copy()
-        elif times.ndim == 2:
-            if times.shape != (n_samples, n_fibers):
-                raise ValueError(
-                    f"2D times array shape {times.shape} must match "
-                    f"(n_samples={n_samples}, n_fibers={n_fibers})"
-                )
-        else:
-            msg = f"times must be 1D or 2D array, got {times.ndim}D"
-            raise ValueError(msg)
-
-        # Store per-fiber times on the segment
-        rs.fiber_time_vectors = times
-
-    def _resolve_fiber_times(self, segment_index: int) -> np.ndarray | None:
-        """
-        Find one segment's per-fiber times, looking upstream if needed.
-
-        Resolution order:
-
-        1. The segment itself -- either a source segment carrying the matrix
-           or a fiber preprocessor segment inheriting it (see
-           :func:`_segment_fiber_times`).
-        2. The parent recording, when this is a preprocessor wrapping one.
-           This covers upstream SpikeInterface preprocessors, whose segments
-           are built inside their own ``__init__`` and therefore know nothing
-           about fibers.
-
-        Step 2 only applies when the parent has the same number of samples.
-        A step that changes the sample count (``resample``, ``decimate``)
-        invalidates the parent's timestamps, so they are dropped rather than
-        misaligned.
-
-        Parameters
-        ----------
-        segment_index : int
-            The segment to resolve, already validated.
-
-        Returns
-        -------
-        np.ndarray or None
-            Times of shape ``(n_samples, n_fibers)``, or None if unavailable.
-        """
-        times = _segment_fiber_times(self.segments[segment_index])
-        if times is not None:
-            return times
-
-        parent = self.get_parent()
-        if parent is None or not hasattr(parent, "get_fiber_times"):
-            return None
-        same_length = parent.get_num_samples(
-            segment_index
-        ) == self.get_num_samples(segment_index)
-        if not same_length or not parent.has_fiber_times(segment_index):
-            return None
-        return parent.get_fiber_times(segment_index=segment_index)
-
-    def has_fiber_times(self, segment_index: int | None = None) -> bool:
-        """
-        Check if per-fiber timestamps are available.
-
-        Follows the same resolution as :meth:`get_fiber_times`, so the two
-        never disagree: True means `get_fiber_times` returns real timestamps
-        rather than ones synthesized from the sampling frequency.
-
-        Parameters
-        ----------
-        segment_index : int, optional
-            The segment index. If None and only one segment exists,
-            defaults to 0.
-
-        Returns
-        -------
-        bool
-            True if per-fiber timestamps are available.
-        """
-        segment_index = self._check_segment_index(segment_index)
-        return self._resolve_fiber_times(segment_index) is not None
-
-    def get_fiber_times(
-        self,
-        segment_index: int | None = None,
-        start_frame: int | None = None,
-        end_frame: int | None = None,
-        fiber_ids: Sequence | None = None,
-    ) -> np.ndarray:
-        """
-        Get per-fiber timestamps.
-
-        Returns real per-fiber timestamps when they are available -- set on
-        this recording via `set_times()`, or inherited from a parent
-        recording it preprocesses (see :meth:`_resolve_fiber_times`).
-        Otherwise falls back to the nominal SI timestamps, broadcast to all
-        fibers; `has_fiber_times()` distinguishes the two cases.
-
-        Parameters
-        ----------
-        segment_index : int, optional
-            The segment index. If None and only one segment exists,
-            defaults to 0.
-        start_frame : int, optional
-            The start frame. If None, starts from the beginning.
-        end_frame : int, optional
-            The end frame (exclusive). If None, reads to the end.
-        fiber_ids : list or array-like, optional
-            The fiber IDs to retrieve. If None, returns all fibers.
-
-        Returns
-        -------
-        times : np.ndarray
-            Array of shape (n_samples, n_fibers) containing timestamps.
-        """
-        segment_index = self._check_segment_index(segment_index)
-
-        # Resolve frame range
-        n_samples = self.get_num_samples(segment_index)
-        if start_frame is None:
-            start_frame = 0
-        if end_frame is None:
-            end_frame = n_samples
-
-        # Resolve fiber indices
-        if fiber_ids is None:
-            fiber_indices = slice(None)
-        else:
-            fiber_indices = self.ids_to_indices(fiber_ids)
-
-        # Get per-fiber times if available, else fall back to nominal
-        fiber_times = self._resolve_fiber_times(segment_index)
-        if fiber_times is not None:
-            return fiber_times[start_frame:end_frame, fiber_indices]
-        else:
-            # Fall back to SI's nominal timestamps, broadcast to all fibers
-            times_1d = self.get_times(segment_index=segment_index)
-            times_1d = times_1d[start_frame:end_frame]
-            if fiber_ids is not None:
-                n_fibers = len(fiber_ids)
-            else:
-                n_fibers = self.get_num_fibers()
-            return np.broadcast_to(
-                times_1d[:, np.newaxis], (len(times_1d), n_fibers)
-            ).copy()
 
     def __repr__(self) -> str:
         """Return a one-line summary: class, color, fiber/segment count."""
@@ -424,7 +210,7 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
         timestamps: np.ndarray,
     ) -> None:
         """
-        Add an in-memory segment and set per-fiber timestamps.
+        Add an in-memory segment and set its timestamps.
 
         Convenience method used by all file-format extractors that load
         data into NumPy arrays. Calls :meth:`add_segment` and
@@ -445,7 +231,7 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
             t_start=t_start,
         )
         self.add_segment(segment)
-        self.set_times(timestamps)
+        self.set_times(timestamps, with_warning=False)
 
 
 class FiberPhotometryRecordingGroup:

@@ -7,10 +7,12 @@ import inspect
 import numpy as np
 import pytest
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
+from spikeinterface.preprocessing.basepreprocessor import (
+    BasePreprocessorSegment,
+)
 from spikeinterface.preprocessing.preprocessing_classes import (
     BandpassFilterRecording,
     CenterRecording,
-    DecimateRecording,
     ScaleRecording,
 )
 
@@ -21,11 +23,9 @@ from fiber_mosaic.core.base import (
 from fiber_mosaic.processing import (
     bandpass_filter,
     highpass_filter,
-    scale,
 )
 from fiber_mosaic.processing.baseprocessor import (
     BaseFiberPhotometryPreprocessor,
-    BaseFiberPhotometryPreprocessorSegment,
     as_fiber_preprocessor,
 )
 from fiber_mosaic.processing.from_spikeinterface import (
@@ -44,7 +44,7 @@ def _make_recording(
     n_segments=1,
     with_times=True,
 ):
-    """Build a recording with per-fiber times offset per fiber."""
+    """Build a recording, optionally with an explicit time vector."""
     sampling_frequency = 100.0
     rec = BaseFiberPhotometryExtractor(
         sampling_frequency=sampling_frequency,
@@ -64,11 +64,11 @@ def _make_recording(
             )
         )
         if with_times:
-            base = np.arange(n_samples) / sampling_frequency
-            offsets = np.arange(len(fiber_ids)) * 0.001
+            times = np.arange(n_samples) / sampling_frequency
             rec.set_times(
-                base[:, None] + offsets + segment_index * 100.0,
+                times + segment_index * 100.0,
                 segment_index=segment_index,
+                with_warning=False,
             )
     return rec
 
@@ -242,92 +242,14 @@ def test_ported_filters_default_to_a_photometry_band():
     assert bandpass_filter(rec).get_fluorescence().shape == (500, 3)
 
 
-# ---------------- per-fiber times propagation ----------------
-
-
-def test_times_inherited_through_a_wrapped_upstream_step():
-    """Case 3: times resolve via the parent recording."""
-    rec = _make_recording()
-    filtered = bandpass_filter(rec, **FILTER_KWARGS)
-
-    assert filtered.has_fiber_times()
-    np.testing.assert_array_equal(
-        filtered.get_fiber_times(), rec.get_fiber_times()
-    )
-
-
-def test_times_inherited_through_a_chain_of_steps():
-    """Resolution recurses, so a two-step chain still sees real times."""
-    rec = _make_recording()
-    chained = scale(bandpass_filter(rec, **FILTER_KWARGS), gain=2.0)
-
-    assert chained.has_fiber_times()
-    np.testing.assert_array_equal(
-        chained.get_fiber_times(), rec.get_fiber_times()
-    )
-
-
-def test_times_slicing_survives_propagation():
-    """Frame and fiber selection work on inherited times too."""
-    rec = _make_recording()
-    filtered = bandpass_filter(rec, **FILTER_KWARGS)
-
-    np.testing.assert_array_equal(
-        filtered.get_fiber_times(
-            start_frame=10, end_frame=20, fiber_ids=["f0", "f2"]
-        ),
-        rec.get_fiber_times(
-            start_frame=10, end_frame=20, fiber_ids=["f0", "f2"]
-        ),
-    )
-
-
-def test_times_inherited_per_segment():
-    """Each segment resolves its own times, not segment 0's."""
-    rec = _make_recording(n_segments=2)
-    filtered = bandpass_filter(rec, **FILTER_KWARGS)
-
-    for segment_index in range(2):
-        np.testing.assert_array_equal(
-            filtered.get_fiber_times(segment_index=segment_index),
-            rec.get_fiber_times(segment_index=segment_index),
-        )
-
-
-def test_no_times_on_parent_means_no_times_downstream():
-    """A source without per-fiber times does not gain them by filtering."""
-    rec = _make_recording(with_times=False)
-    filtered = bandpass_filter(rec, **FILTER_KWARGS)
-
-    assert not filtered.has_fiber_times()
-    assert filtered.get_fiber_times().shape == (500, 3)
-
-
-def test_shape_changing_step_drops_times_rather_than_misaligning():
-    """Decimation invalidates the parent's timestamps, so they are dropped.
-
-    Wrapping a shape-changing step is allowed but not offered as a public
-    function: returning the parent's times here would silently pair each
-    output sample with the wrong timestamp.
-    """
-    rec = _make_recording()
-    fiber_decimate = as_fiber_preprocessor(DecimateRecording)
-    decimated = fiber_decimate(rec, decimation_factor=2)
-
-    assert decimated.get_num_samples() == 250
-    assert not decimated.has_fiber_times()
-
-
 # ---------------- BaseFiberPhotometryPreprocessor ----------------
 
 
-class _GainSegment(BaseFiberPhotometryPreprocessorSegment):
+class _GainSegment(BasePreprocessorSegment):
     """Segment applying a constant gain, to exercise the base classes."""
 
     def __init__(self, parent_recording_segment, gain):
-        BaseFiberPhotometryPreprocessorSegment.__init__(
-            self, parent_recording_segment
-        )
+        BasePreprocessorSegment.__init__(self, parent_recording_segment)
         self.gain = gain
 
     def get_traces(self, start_frame, end_frame, channel_indices):
@@ -357,17 +279,6 @@ def test_own_preprocessor_keeps_fiber_api_and_computes():
     assert gained.get_num_fibers() == 3
     np.testing.assert_allclose(
         gained.get_fluorescence(), rec.get_fluorescence() * 3.0
-    )
-
-
-def test_own_preprocessor_inherits_times_at_the_segment_level():
-    """Case 2: the segment delegates to its parent segment."""
-    rec = _make_recording()
-    gained = _GainRecording(rec)
-
-    assert gained.has_fiber_times()
-    np.testing.assert_array_equal(
-        gained.get_fiber_times(), rec.get_fiber_times()
     )
 
 
@@ -406,7 +317,6 @@ def test_public_function_dispatches_over_a_group():
     assert filtered.colors == ["green", "iso"]
     assert filtered["green"].color == "green"
     assert filtered["iso"].color == "iso"
-    assert filtered["green"].has_fiber_times()
 
 
 def test_public_function_dispatches_over_a_dict():

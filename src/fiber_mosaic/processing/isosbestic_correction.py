@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 from spikeinterface.core import BaseRecording
+from spikeinterface.preprocessing.basepreprocessor import (
+    BasePreprocessorSegment,
+)
 
 from fiber_mosaic.core.core_tools import (
     define_function_handling_group_from_class,
 )
 from fiber_mosaic.processing.baseprocessor import (
     BaseFiberPhotometryPreprocessor,
-    BaseFiberPhotometryPreprocessorSegment,
 )
 
 
-class IsosbesticCorrectionSegment(BaseFiberPhotometryPreprocessorSegment):
+class IsosbesticCorrectionSegment(BasePreprocessorSegment):
     """Segment-level isosbestic correction."""
 
     def __init__(
@@ -21,9 +23,7 @@ class IsosbesticCorrectionSegment(BaseFiberPhotometryPreprocessorSegment):
         recording_segment,
         reference_recording_segment,
     ) -> None:
-        BaseFiberPhotometryPreprocessorSegment.__init__(
-            self, recording_segment
-        )
+        BasePreprocessorSegment.__init__(self, recording_segment)
         self.reference_recording_segment = reference_recording_segment
 
     def get_traces(
@@ -33,7 +33,7 @@ class IsosbesticCorrectionSegment(BaseFiberPhotometryPreprocessorSegment):
         channel_indices,
     ):
         """Return signal divided by reference (isosbestic correction)."""
-        signal = self.recording_segment.get_traces(
+        signal = self.parent_recording_segment.get_traces(
             start_frame,
             end_frame,
             channel_indices,

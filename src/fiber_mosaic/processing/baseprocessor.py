@@ -8,8 +8,6 @@ machinery fiber-native:
 
 - BaseFiberPhotometryPreprocessor: base class for fiber-mosaic's own
   preprocessors, adding the fiber API on top of SI's BasePreprocessor.
-- BaseFiberPhotometryPreprocessorSegment: segment that inherits per-fiber
-  times from its parent segment.
 - as_fiber_preprocessor: gives an existing upstream preprocessor class the
   same fiber-native surface, without reimplementing it.
 
@@ -24,46 +22,14 @@ from __future__ import annotations
 
 import inspect
 
-import numpy as np
 from spikeinterface.core import BaseRecording
 from spikeinterface.preprocessing.basepreprocessor import (
     BasePreprocessor,
-    BasePreprocessorSegment,
 )
 
 from fiber_mosaic.core.base import (
     FiberPhotometryMixin,
-    _segment_fiber_times,
 )
-
-
-class BaseFiberPhotometryPreprocessorSegment(BasePreprocessorSegment):
-    """
-    A preprocessor segment that inherits per-fiber times from its parent.
-
-    SpikeInterface's ``BasePreprocessorSegment`` forwards only the timing
-    described by ``get_times_kwargs()`` -- sampling frequency, ``t_start`` and
-    the 1-D ``time_vector``. Per-fiber times are a fiber-mosaic concept and
-    are not covered, so they are resolved here instead: lazily, by asking the
-    parent segment, which means a chain of preprocessors costs nothing and
-    copies nothing.
-
-    Parameters
-    ----------
-    parent_recording_segment : BaseRecordingSegment
-        The segment being preprocessed.
-    """
-
-    def get_fiber_times(self) -> np.ndarray | None:
-        """
-        Return the parent segment's per-fiber times, or None if it has none.
-
-        Returns
-        -------
-        np.ndarray or None
-            Times of shape ``(n_samples, n_fibers)``, or None.
-        """
-        return _segment_fiber_times(self.parent_recording_segment)
 
 
 class BaseFiberPhotometryPreprocessor(FiberPhotometryMixin, BasePreprocessor):
@@ -91,13 +57,6 @@ class BaseFiberPhotometryPreprocessor(FiberPhotometryMixin, BasePreprocessor):
         Output fiber IDs. Defaults to the parent's.
     dtype : dtype, optional
         Output dtype. Defaults to the parent's.
-
-    Notes
-    -----
-    Per-fiber times reach subclasses through
-    :class:`BaseFiberPhotometryPreprocessorSegment`; steps that preserve the
-    sample count should use it as their segment base class so timestamps are
-    inherited automatically.
     """
 
     def __init__(
@@ -178,9 +137,8 @@ def as_fiber_preprocessor(
 
     Upstream SpikeInterface preprocessors build their segments inside their
     own ``__init__``, so there is no hook for substituting a fiber-aware
-    segment class. Mixing the API in at the recording level instead is enough:
-    per-fiber times then resolve through the parent recording (see
-    :meth:`~fiber_mosaic.core.base.FiberPhotometryMixin._resolve_fiber_times`).
+    segment class. Mixing the API in at the recording level instead is
+    enough, and timestamps propagate through SpikeInterface's own segments.
 
     Parameters
     ----------
@@ -207,14 +165,6 @@ def as_fiber_preprocessor(
     TypeError
         If ``default_kwargs`` names a parameter the class does not accept, or
         one that is required or variadic and so has no default to replace.
-
-    Notes
-    -----
-    Only meaningful for steps that preserve the sample count. Wrapping a step
-    that resamples or decimates yields a working recording, but its per-fiber
-    times are dropped rather than resampled -- ``has_fiber_times()`` returns
-    False and ``get_fiber_times()`` synthesizes nominal times -- because the
-    parent's timestamps no longer line up with the output samples.
 
     Examples
     --------
