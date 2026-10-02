@@ -1,10 +1,12 @@
+"""Isosbestic correction preprocessing step."""
+
 from __future__ import annotations
 
 from spikeinterface.core import BaseRecording
+
 from fiber_mosaic.core.core_tools import (
     define_function_handling_group_from_class,
 )
-
 from fiber_mosaic.processing.baseprocessor import (
     BaseFiberPhotometryPreprocessor,
     BaseFiberPhotometryPreprocessorSegment,
@@ -12,6 +14,8 @@ from fiber_mosaic.processing.baseprocessor import (
 
 
 class IsosbesticCorrectionSegment(BaseFiberPhotometryPreprocessorSegment):
+    """Segment-level isosbestic correction."""
+
     def __init__(
         self,
         recording_segment,
@@ -28,6 +32,7 @@ class IsosbesticCorrectionSegment(BaseFiberPhotometryPreprocessorSegment):
         end_frame,
         channel_indices,
     ):
+        """Return signal divided by reference (isosbestic correction)."""
         signal = self.recording_segment.get_traces(
             start_frame,
             end_frame,
@@ -45,6 +50,8 @@ class IsosbesticCorrectionSegment(BaseFiberPhotometryPreprocessorSegment):
 
 
 class IsosbesticCorrectionRecording(BaseFiberPhotometryPreprocessor):
+    """Recording-level isosbestic correction preprocessor."""
+
     def __init__(
         self,
         recording: BaseRecording,

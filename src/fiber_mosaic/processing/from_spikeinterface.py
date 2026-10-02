@@ -9,8 +9,8 @@ with which defaults. Each entry gives two things:
 - the public function, which dispatches over a recording, a dict of
   recordings, or a FiberPhotometryRecordingGroup.
 
-Porting a step is one call to :func:`port_from_spikeinterface`. Two rules decide whether
-a step belongs here:
+Porting a step is one call to :func:`port_from_spikeinterface`. Two rules
+decide whether a step belongs here:
 
 **It must preserve the sample count.** Per-fiber timestamps are inherited from
 the parent recording, and that inheritance is only valid while samples line up

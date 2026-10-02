@@ -9,7 +9,8 @@ Two things live here:
 
 - `baseprocessor`: base classes for fiber-mosaic's own steps, plus
   `as_fiber_preprocessor` for giving an upstream class the fiber API.
-- `from_spikeinterface`: which upstream steps are ported, and with which defaults.
+- `from_spikeinterface`: which upstream steps are ported, and with which
+  defaults.
 
 Every ported step takes a single recording, a dict of recordings, or a
 FiberPhotometryRecordingGroup, and returns the matching container:
