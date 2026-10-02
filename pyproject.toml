@@ -19,7 +19,7 @@ dependencies = [
      'numpy',
      'pandas',
      'scipy',
-     'spikeinterface @ git+https://github.com/SpikeInterface/spikeinterface.git@main',
+     'spikeinterface>=0.105.0',
 ]
 
 [project.optional-dependencies]
