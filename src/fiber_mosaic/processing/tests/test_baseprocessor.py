@@ -21,7 +21,6 @@ from fiber_mosaic.core.base import (
 from fiber_mosaic.processing import (
     bandpass_filter,
     highpass_filter,
-    port_from_si,
     scale,
 )
 from fiber_mosaic.processing.baseprocessor import (
@@ -29,6 +28,7 @@ from fiber_mosaic.processing.baseprocessor import (
     BaseFiberPhotometryPreprocessorSegment,
     as_fiber_preprocessor,
 )
+from fiber_mosaic.processing.from_si import port_from_si
 
 # A plausible photometry band. No ignore_low_freq_error here: the ported
 # bandpass_filter bakes that in, which is what makes these bands usable.
