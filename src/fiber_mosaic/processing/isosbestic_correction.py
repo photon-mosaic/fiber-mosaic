@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from spikeinterface.core import BaseRecording
+from fiber_mosaic.core.core_tools import (
+    define_function_handling_group_from_class,
+)
 
 from fiber_mosaic.processing.baseprocessor import (
     BaseFiberPhotometryPreprocessor,
@@ -67,8 +70,9 @@ class IsosbesticCorrectionRecording(BaseFiberPhotometryPreprocessor):
 
 
 # this is probably not the way
-def isosbestic_correction(
-    recording: BaseRecording,
-    reference_recording: BaseRecording,
-) -> IsosbesticCorrectionRecording:
-    return IsosbesticCorrectionRecording(recording, reference_recording)
+isosbestic_correction = define_function_handling_group_from_class(
+    IsosbesticCorrectionRecording, "isosbestic_correction"
+)
+
+# how to pipeline: specific processing for each branch
+# replacement of workspace
