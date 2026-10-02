@@ -9,7 +9,7 @@ with which defaults. Each entry gives two things:
 - the public function, which dispatches over a recording, a dict of
   recordings, or a FiberPhotometryRecordingGroup.
 
-Porting a step is one call to :func:`port_from_si`. Two rules decide whether
+Porting a step is one call to :func:`port_from_spikeinterface`. Two rules decide whether
 a step belongs here:
 
 **It must preserve the sample count.** Per-fiber timestamps are inherited from
@@ -61,7 +61,7 @@ _BANDPASS_DEFAULTS = _ALLOW_LOW_FREQ | {"freq_min": 0.1, "freq_max": 5.0}
 _HIGHPASS_DEFAULTS = _ALLOW_LOW_FREQ | {"freq_min": 0.1}
 
 
-def port_from_si(
+def port_from_spikeinterface(
     source_class: type, name: str, default_kwargs: dict | None = None
 ) -> tuple[type, callable]:
     """
@@ -90,25 +90,31 @@ def port_from_si(
     return fiber_class, function
 
 
-FiberBandpassFilterRecording, bandpass_filter = port_from_si(
+FiberBandpassFilterRecording, bandpass_filter = port_from_spikeinterface(
     BandpassFilterRecording, "bandpass_filter", _BANDPASS_DEFAULTS
 )
-FiberHighpassFilterRecording, highpass_filter = port_from_si(
+FiberHighpassFilterRecording, highpass_filter = port_from_spikeinterface(
     HighpassFilterRecording, "highpass_filter", _HIGHPASS_DEFAULTS
 )
-FiberNotchFilterRecording, notch_filter = port_from_si(
+FiberNotchFilterRecording, notch_filter = port_from_spikeinterface(
     NotchFilterRecording, "notch_filter"
 )
-FiberGaussianFilterRecording, gaussian_filter = port_from_si(
+FiberGaussianFilterRecording, gaussian_filter = port_from_spikeinterface(
     GaussianFilterRecording, "gaussian_filter"
 )
-FiberCenterRecording, center = port_from_si(CenterRecording, "center")
-FiberScaleRecording, scale = port_from_si(ScaleRecording, "scale")
-FiberZScoreRecording, zscore = port_from_si(ZScoreRecording, "zscore")
-FiberNormalizeByQuantileRecording, normalize_by_quantile = port_from_si(
-    NormalizeByQuantileRecording, "normalize_by_quantile"
+FiberCenterRecording, center = port_from_spikeinterface(
+    CenterRecording, "center"
 )
-FiberCommonReferenceRecording, common_reference = port_from_si(
+FiberScaleRecording, scale = port_from_spikeinterface(ScaleRecording, "scale")
+FiberZScoreRecording, zscore = port_from_spikeinterface(
+    ZScoreRecording, "zscore"
+)
+FiberNormalizeByQuantileRecording, normalize_by_quantile = (
+    port_from_spikeinterface(
+        NormalizeByQuantileRecording, "normalize_by_quantile"
+    )
+)
+FiberCommonReferenceRecording, common_reference = port_from_spikeinterface(
     CommonReferenceRecording, "common_reference"
 )
 
@@ -129,7 +135,7 @@ __all__ = [
     "highpass_filter",
     "normalize_by_quantile",
     "notch_filter",
-    "port_from_si",
+    "port_from_spikeinterface",
     "scale",
     "zscore",
 ]

@@ -28,7 +28,9 @@ from fiber_mosaic.processing.baseprocessor import (
     BaseFiberPhotometryPreprocessorSegment,
     as_fiber_preprocessor,
 )
-from fiber_mosaic.processing.from_si import port_from_si
+from fiber_mosaic.processing.from_spikeinterface import (
+    port_from_spikeinterface,
+)
 
 # A plausible photometry band. No ignore_low_freq_error here: the ported
 # bandpass_filter bakes that in, which is what makes these bands usable.
@@ -157,7 +159,7 @@ def test_default_kwargs_are_visible_in_the_signature():
 
 def test_default_kwargs_reach_the_public_function_signature():
     """define_function_handling_group_from_class copies the new defaults."""
-    _, function = port_from_si(
+    _, function = port_from_spikeinterface(
         BandpassFilterRecording,
         "narrow_band",
         {"freq_min": 0.1, "freq_max": 5.0, "ignore_low_freq_error": True},
