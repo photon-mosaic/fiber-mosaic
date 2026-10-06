@@ -7,9 +7,6 @@ from spikeinterface.preprocessing.basepreprocessor import (
     BasePreprocessorSegment,
 )
 
-from fiber_mosaic.core.core_tools import (
-    define_function_handling_group_from_class,
-)
 from fiber_mosaic.processing.baseprocessor import (
     BaseFiberPhotometryPreprocessor,
 )
@@ -17,6 +14,11 @@ from fiber_mosaic.processing.baseprocessor import (
 
 class IsosbesticCorrectionSegment(BasePreprocessorSegment):
     """Segment-level isosbestic correction."""
+
+    # TODO implement
+    #  - the robust regressions (different loss functions, MAE, huber) + IRLS
+    #  - choice of correction method: subtract, divide, substract-divide
+    #  - output color naming? should we append _isosbestic-corrected
 
     def __init__(
         self,
@@ -44,7 +46,7 @@ class IsosbesticCorrectionSegment(BasePreprocessorSegment):
             end_frame,
             channel_indices,
         )
-        # dummy correction for now, to be controlled with an kwarg
+        # dummy correction for now
         signal /= reference
         return signal
 
@@ -76,10 +78,29 @@ class IsosbesticCorrectionRecording(BaseFiberPhotometryPreprocessor):
         )
 
 
-# this is probably not the way
-isosbestic_correction = define_function_handling_group_from_class(
-    IsosbesticCorrectionRecording, "isosbestic_correction"
-)
+def isosbestic_correction(
+    recording: BaseRecording, reference_recording: BaseRecording
+) -> IsosbesticCorrectionRecording:
+    """
+    Correct a signal recording with its isosbestic reference.
+
+    Takes one signal and one reference, never a group: a group does not
+    define which color corrects which.
+
+    Parameters
+    ----------
+    recording : BaseRecording
+        The signal recording, e.g. ``group["green"]``.
+    reference_recording : BaseRecording
+        The isosbestic reference, e.g. ``group["iso"]``.
+
+    Returns
+    -------
+    IsosbesticCorrectionRecording
+        The corrected signal.
+    """
+    return IsosbesticCorrectionRecording(recording, reference_recording)
+
 
 # how to pipeline: specific processing for each branch
 # replacement of workspace
