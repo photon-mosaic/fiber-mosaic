@@ -18,7 +18,8 @@ dynamic = ["version"]
 dependencies = [
      'numpy',
      'pandas',
-     'spikeinterface @ git+https://github.com/SpikeInterface/spikeinterface.git@main',
+     'scipy',
+     'spikeinterface>=0.105.0',
 ]
 
 [project.optional-dependencies]
