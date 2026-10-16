@@ -9,7 +9,8 @@ with which defaults. Each entry gives two things:
 - the public function, which dispatches over a recording, a dict of
   recordings, or a FiberPhotometryRecordingGroup.
 
-Porting a step is one call to :func:`port_from_spikeinterface`. Two rules
+Each port is a plain class statement, so SpikeInterface can find it again by
+``__module__`` and ``__name__`` when it reloads or unpickles a step. Two rules
 decide whether a step belongs here:
 
 **It must preserve the sample count.** Per-fiber timestamps are inherited from
@@ -19,13 +20,14 @@ per-step timestamp rules (subsampling for decimate, interpolation for
 resample) before they can be offered.
 
 **Its defaults must make sense for photometry.** Upstream defaults are chosen
-for electrophysiology at tens of kilohertz. ``default_kwargs`` replaces them
-without touching upstream; callers still override explicitly, and the new
-defaults show up in `help()` and `inspect.signature`.
+for electrophysiology at tens of kilohertz. A port replaces them by
+redeclaring ``__init__`` with new defaults; callers still override
+explicitly, and the new defaults show up in `help()` and `inspect.signature`.
 """
 
 from __future__ import annotations
 
+from spikeinterface.core import BaseRecording
 from spikeinterface.preprocessing.preprocessing_classes import (
     BandpassFilterRecording,
     CenterRecording,
@@ -38,84 +40,150 @@ from spikeinterface.preprocessing.preprocessing_classes import (
     ZScoreRecording,
 )
 
+from fiber_mosaic.core.base import FiberPhotometryMixin
 from fiber_mosaic.core.core_tools import (
     define_function_handling_group_from_class,
 )
-from fiber_mosaic.processing.baseprocessor import as_fiber_preprocessor
-
-# SpikeInterface rejects freq_min below an absolute 100 Hz threshold, warning
-# about chunking artifacts. The threshold is not relative to the sampling
-# rate, so it fires for every useful photometry band; the margin that actually
-# prevents those artifacts is sized from freq_min separately (margin_ms="auto")
-# and still applies. Bypass the threshold rather than make every caller do it.
-_ALLOW_LOW_FREQ = {"ignore_low_freq_error": True}
-
-# Upstream defaults are 300 Hz / 6 kHz, chosen for spike-band ephys and
-# meaningless above the Nyquist frequency of a photometry rig. These are
-# conventional starting points, not the right answer for any given
-# experiment: 0.1 Hz removes slow drift while leaving calcium transient decay
-# (~0.5-2 s) intact, and 5 Hz sits above the fastest calcium kinetics while
-# staying below Nyquist even for the ~20 Hz systems. Both remain overridable
-# per call, and analyses should state the band they used.
-_BANDPASS_DEFAULTS = _ALLOW_LOW_FREQ | {"freq_min": 0.1, "freq_max": 5.0}
-_HIGHPASS_DEFAULTS = _ALLOW_LOW_FREQ | {"freq_min": 0.1}
 
 
-def port_from_spikeinterface(
-    source_class: type, name: str, default_kwargs: dict | None = None
-) -> tuple[type, callable]:
+class FiberBandpassFilterRecording(
+    FiberPhotometryMixin, BandpassFilterRecording
+):
+    """``BandpassFilterRecording`` with photometry defaults.
+
+    Upstream defaults are 300 Hz / 6 kHz, chosen for spike-band ephys and
+    meaningless above the Nyquist frequency of a photometry rig. These are
+    conventional starting points, not the right answer for any given
+    experiment: 0.1 Hz removes slow drift while leaving calcium transient
+    decay (~0.5-2 s) intact, and 5 Hz sits above the fastest calcium kinetics
+    while staying below Nyquist even for the ~20 Hz systems. Analyses should
+    state the band they used.
+
+    SpikeInterface rejects freq_min below an absolute 100 Hz threshold,
+    warning about chunking artifacts. The threshold is not relative to the
+    sampling rate, so it fires for every useful photometry band; the margin
+    that actually prevents those artifacts is sized from freq_min separately
+    (margin_ms="auto") and still applies. ``ignore_low_freq_error`` therefore
+    defaults to True.
     """
-    Port one upstream preprocessor into fiber-mosaic.
 
-    Parameters
-    ----------
-    source_class : type
-        The upstream preprocessor class to port.
-    name : str
-        Public name for the resulting function.
-    default_kwargs : dict, optional
-        Defaults to replace on the upstream constructor.
+    def __init__(
+        self,
+        recording: BaseRecording,
+        freq_min: float = 0.1,
+        freq_max: float = 5.0,
+        margin_ms: float | str = "auto",
+        dtype=None,
+        ignore_low_freq_error: bool = True,
+        _skip_margin_warning_for_old_version: bool = False,
+        **filter_kwargs,
+    ) -> None:
+        BandpassFilterRecording.__init__(
+            self,
+            recording,
+            freq_min=freq_min,
+            freq_max=freq_max,
+            margin_ms=margin_ms,
+            dtype=dtype,
+            ignore_low_freq_error=ignore_low_freq_error,
+            _skip_margin_warning_for_old_version=(
+                _skip_margin_warning_for_old_version
+            ),
+            **filter_kwargs,
+        )
 
-    Returns
-    -------
-    fiber_class : type
-        Fiber-aware subclass of ``source_class``.
-    function : callable
-        Public function dispatching over recording / dict / group.
+
+class FiberHighpassFilterRecording(
+    FiberPhotometryMixin, HighpassFilterRecording
+):
+    """``HighpassFilterRecording`` with photometry defaults.
+
+    See :class:`FiberBandpassFilterRecording` for why ``freq_min`` defaults
+    to 0.1 Hz and ``ignore_low_freq_error`` to True.
     """
-    fiber_class = as_fiber_preprocessor(
-        source_class, default_kwargs=default_kwargs
-    )
-    function = define_function_handling_group_from_class(fiber_class, name)
-    return fiber_class, function
+
+    def __init__(
+        self,
+        recording: BaseRecording,
+        freq_min: float = 0.1,
+        margin_ms: float | str = "auto",
+        dtype=None,
+        ignore_low_freq_error: bool = True,
+        _skip_margin_warning_for_old_version: bool = False,
+        **filter_kwargs,
+    ) -> None:
+        HighpassFilterRecording.__init__(
+            self,
+            recording,
+            freq_min=freq_min,
+            margin_ms=margin_ms,
+            dtype=dtype,
+            ignore_low_freq_error=ignore_low_freq_error,
+            _skip_margin_warning_for_old_version=(
+                _skip_margin_warning_for_old_version
+            ),
+            **filter_kwargs,
+        )
 
 
-FiberBandpassFilterRecording, bandpass_filter = port_from_spikeinterface(
-    BandpassFilterRecording, "bandpass_filter", _BANDPASS_DEFAULTS
+class FiberNotchFilterRecording(FiberPhotometryMixin, NotchFilterRecording):
+    """``NotchFilterRecording`` with the fiber API."""
+
+
+class FiberGaussianFilterRecording(
+    FiberPhotometryMixin, GaussianFilterRecording
+):
+    """``GaussianFilterRecording`` with the fiber API."""
+
+
+class FiberCenterRecording(FiberPhotometryMixin, CenterRecording):
+    """``CenterRecording`` with the fiber API."""
+
+
+class FiberScaleRecording(FiberPhotometryMixin, ScaleRecording):
+    """``ScaleRecording`` with the fiber API."""
+
+
+class FiberZScoreRecording(FiberPhotometryMixin, ZScoreRecording):
+    """``ZScoreRecording`` with the fiber API."""
+
+
+class FiberNormalizeByQuantileRecording(
+    FiberPhotometryMixin, NormalizeByQuantileRecording
+):
+    """``NormalizeByQuantileRecording`` with the fiber API."""
+
+
+class FiberCommonReferenceRecording(
+    FiberPhotometryMixin, CommonReferenceRecording
+):
+    """``CommonReferenceRecording`` with the fiber API."""
+
+
+bandpass_filter = define_function_handling_group_from_class(
+    FiberBandpassFilterRecording, "bandpass_filter"
 )
-FiberHighpassFilterRecording, highpass_filter = port_from_spikeinterface(
-    HighpassFilterRecording, "highpass_filter", _HIGHPASS_DEFAULTS
+highpass_filter = define_function_handling_group_from_class(
+    FiberHighpassFilterRecording, "highpass_filter"
 )
-FiberNotchFilterRecording, notch_filter = port_from_spikeinterface(
-    NotchFilterRecording, "notch_filter"
+notch_filter = define_function_handling_group_from_class(
+    FiberNotchFilterRecording, "notch_filter"
 )
-FiberGaussianFilterRecording, gaussian_filter = port_from_spikeinterface(
-    GaussianFilterRecording, "gaussian_filter"
+gaussian_filter = define_function_handling_group_from_class(
+    FiberGaussianFilterRecording, "gaussian_filter"
 )
-FiberCenterRecording, center = port_from_spikeinterface(
-    CenterRecording, "center"
+center = define_function_handling_group_from_class(
+    FiberCenterRecording, "center"
 )
-FiberScaleRecording, scale = port_from_spikeinterface(ScaleRecording, "scale")
-FiberZScoreRecording, zscore = port_from_spikeinterface(
-    ZScoreRecording, "zscore"
+scale = define_function_handling_group_from_class(FiberScaleRecording, "scale")
+zscore = define_function_handling_group_from_class(
+    FiberZScoreRecording, "zscore"
 )
-FiberNormalizeByQuantileRecording, normalize_by_quantile = (
-    port_from_spikeinterface(
-        NormalizeByQuantileRecording, "normalize_by_quantile"
-    )
+normalize_by_quantile = define_function_handling_group_from_class(
+    FiberNormalizeByQuantileRecording, "normalize_by_quantile"
 )
-FiberCommonReferenceRecording, common_reference = port_from_spikeinterface(
-    CommonReferenceRecording, "common_reference"
+common_reference = define_function_handling_group_from_class(
+    FiberCommonReferenceRecording, "common_reference"
 )
 
 __all__ = [
@@ -135,7 +203,6 @@ __all__ = [
     "highpass_filter",
     "normalize_by_quantile",
     "notch_filter",
-    "port_from_spikeinterface",
     "scale",
     "zscore",
 ]

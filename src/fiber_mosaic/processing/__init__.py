@@ -7,8 +7,7 @@ intermediates keep their provenance and can be sliced, saved and reloaded.
 
 Two things live here:
 
-- `baseprocessor`: base classes for fiber-mosaic's own steps, plus
-  `as_fiber_preprocessor` for giving an upstream class the fiber API.
+- `baseprocessor`: base classes for fiber-mosaic's own steps.
 - `from_spikeinterface`: which upstream steps are ported, and with which
   defaults.
 

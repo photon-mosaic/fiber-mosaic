@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+import importlib
 import inspect
 import pickle
 
 import numpy as np
 import pytest
-from spikeinterface.core.numpyextractors import NumpyRecordingSegment
+from spikeinterface.core.numpyextractors import (
+    NumpyRecording,
+    NumpyRecordingSegment,
+)
 from spikeinterface.preprocessing.basepreprocessor import (
     BasePreprocessorSegment,
 )
 from spikeinterface.preprocessing.preprocessing_classes import (
     BandpassFilterRecording,
-    CenterRecording,
-    ScaleRecording,
 )
 
 from fiber_mosaic.core.base import (
@@ -23,14 +25,16 @@ from fiber_mosaic.core.base import (
 )
 from fiber_mosaic.processing import (
     bandpass_filter,
+    from_spikeinterface,
     highpass_filter,
+    scale,
 )
 from fiber_mosaic.processing.baseprocessor import (
     BaseFiberPhotometryPreprocessor,
-    as_fiber_preprocessor,
 )
 from fiber_mosaic.processing.from_spikeinterface import (
-    port_from_spikeinterface,
+    FiberBandpassFilterRecording,
+    FiberScaleRecording,
 )
 
 # A plausible photometry band. No ignore_low_freq_error here: the ported
@@ -74,7 +78,24 @@ def _make_recording(
     return rec
 
 
-# ---------------- as_fiber_preprocessor ----------------
+def _dumpable_recording():
+    """A recording SpikeInterface can rebuild from its dict, for pickling.
+
+    ``_make_recording`` adds segments by hand and records no ``_kwargs``, so
+    its reloaded copy would have no segments.
+    """
+    traces = np.random.default_rng(0).standard_normal((500, 3))
+    return NumpyRecording([traces.astype("float32")], 100.0)
+
+
+def _ported_classes():
+    """Every Fiber... class exported by ``from_spikeinterface``."""
+    for name in from_spikeinterface.__all__:
+        if name.startswith("Fiber"):
+            yield getattr(from_spikeinterface, name)
+
+
+# ---------------- ported classes ----------------
 
 
 def test_wrapped_class_keeps_the_fiber_api():
@@ -117,25 +138,32 @@ def test_wrapped_class_is_a_subclass_of_the_upstream_one():
     )
 
 
-def test_as_fiber_preprocessor_default_and_custom_name():
-    """The generated class is named for its source unless told otherwise."""
-    assert (
-        as_fiber_preprocessor(BandpassFilterRecording).__name__
-        == "FiberBandpassFilterRecording"
-    )
-    assert (
-        as_fiber_preprocessor(BandpassFilterRecording, name="Custom").__name__
-        == "Custom"
-    )
-
-
 def test_wrapped_class_survives_pickle() -> None:
     """A ported step can be pickled and restored as the same class."""
-    filtered = bandpass_filter(_make_recording(), **FILTER_KWARGS)
+    filtered = bandpass_filter(_dumpable_recording(), **FILTER_KWARGS)
 
     restored = pickle.loads(pickle.dumps(filtered))
 
     assert type(restored) is type(filtered)
+    assert restored._kwargs["freq_min"] == FILTER_KWARGS["freq_min"]
+    np.testing.assert_allclose(restored.get_traces(), filtered.get_traces())
+
+
+@pytest.mark.parametrize("fiber_class", list(_ported_classes()))
+def test_every_ported_class_reloads_from_its_dict(fiber_class) -> None:
+    """SpikeInterface finds each class again by its module and name."""
+    module = importlib.import_module(fiber_class.__module__)
+    assert getattr(module, fiber_class.__name__) is fiber_class
+
+
+def test_class_without_new_defaults_survives_pickle() -> None:
+    """An empty port pickles too, through load() of its dict."""
+    scaled = scale(_dumpable_recording(), gain=2.0)
+
+    restored = pickle.loads(pickle.dumps(scaled))
+
+    assert type(restored) is FiberScaleRecording
+    np.testing.assert_allclose(restored.get_traces(), scaled.get_traces())
 
 
 # ---------------- default_kwargs overrides ----------------
@@ -156,88 +184,23 @@ def test_ported_filter_bakes_in_the_low_freq_bypass():
 
 def test_default_kwargs_are_visible_in_the_signature():
     """Overridden defaults show up in help() and inspect.signature."""
-    fiber_class = as_fiber_preprocessor(
-        BandpassFilterRecording,
-        default_kwargs={"freq_min": 0.1, "freq_max": 5.0},
-    )
-    parameters = inspect.signature(fiber_class).parameters
+    parameters = inspect.signature(FiberBandpassFilterRecording).parameters
     assert parameters["freq_min"].default == 0.1
     assert parameters["freq_max"].default == 5.0
     # untouched parameters keep the upstream default
     assert parameters["margin_ms"].default == "auto"
 
 
-def test_default_kwargs_reach_the_public_function_signature():
-    """define_function_handling_group_from_class copies the new defaults."""
-    _, function = port_from_spikeinterface(
-        BandpassFilterRecording,
-        "narrow_band",
-        {"freq_min": 0.1, "freq_max": 5.0, "ignore_low_freq_error": True},
-    )
-    assert function.__signature__.parameters["freq_min"].default == 0.1
+def test_explicit_keyword_beats_the_default():
+    """The photometry default is only a default; callers still win."""
+    filtered = bandpass_filter(_make_recording(), freq_min=2.0)
+    assert filtered._kwargs["freq_min"] == 2.0
 
 
-def test_explicit_keyword_beats_the_override():
-    """The override is only a default; callers still win."""
-    rec = _make_recording()
-    fiber_class = as_fiber_preprocessor(
-        ScaleRecording, default_kwargs={"gain": 2.0}
-    )
-
-    np.testing.assert_allclose(
-        fiber_class(rec).get_traces(), rec.get_traces() * 2.0
-    )
-    np.testing.assert_allclose(
-        fiber_class(rec, gain=5.0).get_traces(), rec.get_traces() * 5.0
-    )
-
-
-def test_positional_argument_beats_the_override():
-    """A value passed positionally is not overridden either."""
-    rec = _make_recording()
-    fiber_class = as_fiber_preprocessor(
-        ScaleRecording, default_kwargs={"gain": 2.0}
-    )
-
-    np.testing.assert_allclose(
-        fiber_class(rec, 5.0).get_traces(), rec.get_traces() * 5.0
-    )
-
-
-def test_default_kwargs_rejects_unknown_parameter():
-    """A typo is caught at wrap time, not at call time.
-
-    ScaleRecording takes no ``**kwargs``, so an unrecognized name cannot be
-    anything but a mistake.
-    """
-    with pytest.raises(TypeError, match="has no parameter 'gian'"):
-        as_fiber_preprocessor(ScaleRecording, default_kwargs={"gian": 2.0})
-
-
-def test_default_kwargs_rejects_required_parameter():
-    """Only parameters that already have a default can be changed."""
-    with pytest.raises(TypeError, match="required parameter"):
-        as_fiber_preprocessor(
-            ScaleRecording, default_kwargs={"recording": None}
-        )
-
-
-def test_default_kwargs_rejects_variadic_parameter():
-    """A **kwargs catch-all has no default to replace."""
-    with pytest.raises(TypeError, match="variadic parameter"):
-        as_fiber_preprocessor(
-            CenterRecording, default_kwargs={"random_chunk_kwargs": {}}
-        )
-
-
-def test_unknown_parameter_allowed_when_class_takes_extra_kwargs():
-    """Names absorbed by a **kwargs catch-all are passed through."""
-    fiber_class = as_fiber_preprocessor(
-        BandpassFilterRecording,
-        default_kwargs={"ftype": "butter", "ignore_low_freq_error": True},
-    )
-    rec = _make_recording()
-    assert fiber_class(rec, **FILTER_KWARGS).get_num_fibers() == 3
+def test_extra_filter_kwargs_pass_through():
+    """Names absorbed by upstream's **filter_kwargs still reach it."""
+    filtered = bandpass_filter(_make_recording(), ftype="bessel")
+    assert filtered._kwargs["ftype"] == "bessel"
 
 
 def test_ported_filters_default_to_a_photometry_band():
@@ -250,6 +213,7 @@ def test_ported_filters_default_to_a_photometry_band():
     # and they work with no band specified at all, at 100 Hz sampling
     rec = _make_recording()
     assert bandpass_filter(rec).get_fluorescence().shape == (500, 3)
+    assert highpass_filter(rec).get_fluorescence().shape == (500, 3)
 
 
 # ---------------- BaseFiberPhotometryPreprocessor ----------------
