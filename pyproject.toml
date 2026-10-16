@@ -30,6 +30,7 @@ dev = [
     'coverage',
     'furo',
     'h5py',
+    'matplotlib',
     'pynwb',
     'pytest',
     'pytest-cov',
