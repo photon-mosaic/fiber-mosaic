@@ -5,11 +5,11 @@ from __future__ import annotations
 import numpy as np
 
 from fiber_mosaic.core.base import (
-    BaseFiberPhotometryExtractor,
+    FiberPhotometryMixin,
     FiberPhotometryRecordingGroup,
+    recording_from_traces,
 )
 from fiber_mosaic.synthetic import (
-    recording_from_traces,
     simulate_bands,
     simulate_group,
 )
@@ -63,7 +63,7 @@ def test_simulate_group_and_recording_from_traces():
     assert group.get_num_fibers() == _NUM_FIBERS
     assert calcium.shape == (_NUM_SAMPLES, _NUM_FIBERS)
     green = group["green"]
-    assert isinstance(green, BaseFiberPhotometryExtractor)
+    assert isinstance(green, FiberPhotometryMixin)
     assert green.color == "green"
     assert green.get_num_samples() == _NUM_SAMPLES
 
@@ -76,3 +76,16 @@ def test_simulate_group_and_recording_from_traces():
     assert multi.get_num_segments() == 2
     assert multi.get_num_samples(1) == 4
     np.testing.assert_array_equal(multi.get_fiber_ids(), ["a", "b"])
+
+
+def test_simulate_group_uses_explicit_sampling_frequency():
+    """A non-default rate reaches both recordings, not just simulate_bands."""
+    rate = 100.0
+    group, _ = simulate_group(
+        num_samples=_NUM_SAMPLES,
+        num_fibers=_NUM_FIBERS,
+        sampling_frequency=rate,
+    )
+
+    assert group["green"].get_sampling_frequency() == rate
+    assert group["iso"].get_sampling_frequency() == rate
