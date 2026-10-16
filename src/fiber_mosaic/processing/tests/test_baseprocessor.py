@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import pickle
 
 import numpy as np
 import pytest
@@ -126,6 +127,15 @@ def test_as_fiber_preprocessor_default_and_custom_name():
         as_fiber_preprocessor(BandpassFilterRecording, name="Custom").__name__
         == "Custom"
     )
+
+
+def test_wrapped_class_survives_pickle() -> None:
+    """A ported step can be pickled and restored as the same class."""
+    filtered = bandpass_filter(_make_recording(), **FILTER_KWARGS)
+
+    restored = pickle.loads(pickle.dumps(filtered))
+
+    assert type(restored) is type(filtered)
 
 
 # ---------------- default_kwargs overrides ----------------
