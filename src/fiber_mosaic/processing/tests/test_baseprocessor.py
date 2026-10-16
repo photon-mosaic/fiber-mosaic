@@ -166,7 +166,7 @@ def test_class_without_new_defaults_survives_pickle() -> None:
     np.testing.assert_allclose(restored.get_traces(), scaled.get_traces())
 
 
-# ---------------- default_kwargs overrides ----------------
+# ---------------- photometry defaults ----------------
 
 
 def test_ported_filter_bakes_in_the_low_freq_bypass():

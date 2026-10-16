@@ -10,14 +10,8 @@ with which defaults. Each entry gives two things:
   recordings, or a FiberPhotometryRecordingGroup.
 
 Each port is a plain class statement, so SpikeInterface can find it again by
-``__module__`` and ``__name__`` when it reloads or unpickles a step. Two rules
-decide whether a step belongs here:
-
-**It must preserve the sample count.** Per-fiber timestamps are inherited from
-the parent recording, and that inheritance is only valid while samples line up
-one-to-one. `resample` and `decimate` are therefore absent: they need
-per-step timestamp rules (subsampling for decimate, interpolation for
-resample) before they can be offered.
+``__module__`` and ``__name__`` when it reloads or unpickles a step. One rule
+decides whether a step belongs here:
 
 **Its defaults must make sense for photometry.** Upstream defaults are chosen
 for electrophysiology at tens of kilohertz. A port replaces them by

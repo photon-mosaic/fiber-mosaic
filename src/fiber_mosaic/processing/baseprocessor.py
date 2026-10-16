@@ -11,9 +11,11 @@ machinery fiber-native:
 
 `BasePreprocessor` propagates metadata with ``copy_metadata(only_main=False)``,
 which carries annotations and channel properties but not attributes or
-methods. That is why the fiber API lives in
-:class:`~fiber_mosaic.core.base.FiberPhotometryMixin` and the color is stored
-as an annotation -- both then survive any preprocessing step.
+methods. That is why the color is stored as an annotation: it survives any
+preprocessing step. The fiber API itself lives in
+:class:`~fiber_mosaic.core.base.FiberPhotometryMixin`, so only fiber-mosaic's
+own classes have it -- subclasses of this module's base class and the ports
+in :mod:`~fiber_mosaic.processing.from_spikeinterface`.
 """
 
 from __future__ import annotations
