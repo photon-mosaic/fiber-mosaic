@@ -29,6 +29,7 @@ dev = [
     'coverage',
     'furo',
     'h5py',
+    'neuroconv[fiber_photometry_minimal]>=0.10.0',
     'pynwb',
     'pytest',
     'pytest-cov',
