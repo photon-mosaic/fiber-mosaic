@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import spikeinterface as si
 
-from fiber_mosaic.io.nwb import dump_recording
+from fiber_mosaic.io.nwb import dump_group, dump_recording
 
 
 def test_dump_recording_round_trips(recording, tmp_path):
@@ -15,3 +15,25 @@ def test_dump_recording_round_trips(recording, tmp_path):
     np.testing.assert_array_equal(
         si.load(path).get_traces(), recording.get_traces()
     )
+
+
+def test_dump_group_names_files_after_each_raw_source(group, tmp_path):
+    paths = dump_group(group, tmp_path)
+
+    assert paths == {
+        "green": tmp_path / "green_green.json",
+        "iso": tmp_path / "iso_iso.json",
+    }
+    for color, path in paths.items():
+        np.testing.assert_array_equal(
+            si.load(path).get_traces(), group[color].get_traces()
+        )
+
+
+def test_dump_group_uses_a_given_prefix(group, tmp_path):
+    paths = dump_group(group, tmp_path, prefix="session")
+
+    assert paths == {
+        "green": tmp_path / "session_green.json",
+        "iso": tmp_path / "session_iso.json",
+    }

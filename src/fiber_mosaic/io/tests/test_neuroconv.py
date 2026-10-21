@@ -29,26 +29,27 @@ def test_source_schema_takes_a_path():
 def test_raw_recording_goes_to_acquisition_only(recording, tmp_path):
     nwbfile = _write(recording, tmp_path)
 
-    assert list(nwbfile.acquisition) == [
-        "FiberPhotometryResponseSeriesGreenFiberA"
-    ]
+    assert list(nwbfile.acquisition) == ["FiberPhotometryResponseSeriesGreen"]
     assert not nwbfile.processing
 
 
-def test_processed_recording_adds_its_raw_reader(recording, tmp_path):
+def test_processed_two_fiber_recording_adds_its_raw_reader(
+    two_fiber_recording, tmp_path
+):
     processed = bandpass_filter(
-        recording, freq_min=0.1, freq_max=5.0, ignore_low_freq_error=True
+        two_fiber_recording,
+        freq_min=0.1,
+        freq_max=5.0,
+        ignore_low_freq_error=True,
     )
 
     nwbfile = _write(processed, tmp_path)
 
-    raw_series = nwbfile.acquisition[
-        "FiberPhotometryResponseSeriesGreenFiberA"
-    ]
+    raw_series = nwbfile.acquisition["FiberPhotometryResponseSeriesGreen"]
     processed_series = nwbfile.processing["ophys"][
-        "FiberPhotometryResponseSeriesGreenFiberAProcessed"
+        "FiberPhotometryResponseSeriesGreenProcessed"
     ]
-    np.testing.assert_allclose(raw_series.data, recording.get_traces()[:, 0])
     np.testing.assert_allclose(
-        processed_series.data, processed.get_traces()[:, 0]
+        raw_series.data, two_fiber_recording.get_traces()
     )
+    np.testing.assert_allclose(processed_series.data, processed.get_traces())

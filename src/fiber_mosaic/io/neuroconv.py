@@ -49,21 +49,27 @@ class _RecordingPhotometryInterface(
         return metadata
 
 
+def _raw_reader(recording: BaseRecording) -> BaseRecording:
+    """Return the reader at the root of ``recording``'s processing chain."""
+    while recording.get_parent() is not None:
+        recording = recording.get_parent()
+    return recording
+
+
 def _writer(
     recording: BaseRecording, role: str, name_suffix: str = ""
 ) -> _RecordingPhotometryInterface:
     """Build the single-series writer for ``recording``.
 
-    ``role`` ("raw" or "processed") ends the metadata key, so the raw and
-    processed series of one fiber read separate metadata entries.
+    One series per color, one column per fiber, so name and key carry the
+    color only. ``role`` ("raw" or "processed") ends the metadata key, so the
+    raw and processed series of one color read separate metadata entries.
     """
     color = recording.get_annotation("color")
-    fiber_id = recording.get_channel_ids()[0]
-    name = f"FiberPhotometryResponseSeries{_camel(color)}{_camel(fiber_id)}"
     return _RecordingPhotometryInterface(
         recording,
-        metadata_key=f"fiber_photometry_{color}_{fiber_id}_{role}",
-        name=name + name_suffix,
+        metadata_key=f"fiber_photometry_{color}_{role}",
+        name=f"FiberPhotometryResponseSeries{_camel(color)}{name_suffix}",
     )
 
 
@@ -86,9 +92,7 @@ class FiberMosaicPhotometryInterface(BaseDataInterface):
     def __init__(self, file_path: FilePath, verbose: bool = False) -> None:
         super().__init__(verbose=verbose, file_path=file_path)
         processed = spikeinterface.load(file_path)
-        raw = processed
-        while raw.get_parent() is not None:
-            raw = raw.get_parent()
+        raw = _raw_reader(processed)
         self._writers = {"acquisition": _writer(raw, "raw")}
         if processed is not raw:
             self._writers["processing/ophys"] = _writer(

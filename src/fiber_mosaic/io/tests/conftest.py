@@ -5,16 +5,42 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from fiber_mosaic.core.base import FiberPhotometryRecordingGroup
 from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
+
+
+def _csv_recording(folder, color, fiber_ids=("fiber_a",)):
+    """Write ``{color}.csv`` with one sine column per fiber and read it."""
+    times = np.arange(200) / 20.0
+    traces = np.sin(np.outer(times, np.arange(1, 1 + len(fiber_ids))))
+    csv_path = folder / f"{color}.csv"
+    np.savetxt(
+        csv_path,
+        np.column_stack([times, traces]),
+        delimiter=",",
+        header=",".join(["time", *fiber_ids]),
+        comments="",
+    )
+    return CsvFiberPhotometryExtractor(
+        csv_path, color=color, time_column="time"
+    )
 
 
 @pytest.fixture
 def recording(tmp_path):
     """One-fiber green recording read from a CSV file in ``tmp_path``."""
-    times = np.arange(200) / 20.0
-    rows = [f"{t},{np.sin(t)}" for t in times]
-    csv_path = tmp_path / "green.csv"
-    csv_path.write_text("\n".join(["time,fiber_a", *rows]))
-    return CsvFiberPhotometryExtractor(
-        csv_path, color="green", time_column="time"
+    return _csv_recording(tmp_path, "green")
+
+
+@pytest.fixture
+def group(tmp_path):
+    """Green and iso recordings, each read from its own CSV file."""
+    return FiberPhotometryRecordingGroup(
+        {color: _csv_recording(tmp_path, color) for color in ("green", "iso")}
     )
+
+
+@pytest.fixture
+def two_fiber_recording(tmp_path):
+    """Two-fiber green recording read from a CSV file in ``tmp_path``."""
+    return _csv_recording(tmp_path, "green", ("fiber_a", "fiber_b"))
