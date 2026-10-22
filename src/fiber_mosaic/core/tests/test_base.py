@@ -11,6 +11,7 @@ from fiber_mosaic.core.base import (
     BaseFiberPhotometryExtractor,
     FiberPhotometryMixin,
     FiberPhotometryRecordingGroup,
+    recording_from_traces,
 )
 
 
@@ -221,6 +222,81 @@ def test_color_survives_copy_metadata(recording):
 
     assert other.get_annotation("color") == "green"
     assert other.color == "green"
+
+
+# ---------------- recording_from_traces ----------------
+
+
+def test_recording_from_traces_without_timestamps():
+    """No ``timestamps`` -> nominal times, from ``sampling_frequency``."""
+    traces = np.ones((10, 2), dtype="float32")
+    rec = recording_from_traces(
+        traces, color="green", sampling_frequency=100.0
+    )
+
+    assert isinstance(rec, FiberPhotometryMixin)
+    assert rec.color == "green"
+    assert not rec.has_time_vector()
+
+
+@pytest.mark.parametrize(
+    "as_type",
+    [np.asarray, list],
+    ids=["ndarray", "plain_list"],
+)
+def test_recording_from_traces_with_1d_timestamps(as_type):
+    """A bare 1-D ``timestamps`` sets real times, single segment --
+    whether given as an ``np.ndarray`` or a plain list."""
+    traces = np.ones((10, 2), dtype="float32")
+    times = np.linspace(0.0, 0.09, 10) + 0.001  # offset, not nominal
+
+    rec = recording_from_traces(
+        traces,
+        color="green",
+        sampling_frequency=100.0,
+        timestamps=as_type(times),
+    )
+
+    assert rec.has_time_vector()
+    np.testing.assert_allclose(rec.get_times(), times)
+
+
+def test_recording_from_traces_with_per_segment_timestamps():
+    """A list of ``timestamps`` sets real times per segment."""
+    traces = [np.ones((5, 2)), np.zeros((4, 2))]
+    times = [np.linspace(1.0, 1.04, 5), np.linspace(2.0, 2.03, 4)]
+
+    rec = recording_from_traces(
+        traces, color="red", sampling_frequency=100.0, timestamps=times
+    )
+
+    for segment_index, segment_times in enumerate(times):
+        np.testing.assert_allclose(
+            rec.get_times(segment_index=segment_index), segment_times
+        )
+
+
+@pytest.mark.parametrize("container", [list, tuple])
+def test_recording_from_traces_with_sequence_traces(container):
+    """A sequence of per-segment arrays works as a list or a tuple."""
+    traces = container([np.ones((5, 2)), np.zeros((4, 2))])
+
+    rec = recording_from_traces(traces, color="red", sampling_frequency=100.0)
+
+    assert rec.get_num_segments() == 2
+    assert rec.get_num_samples(1) == 4
+
+
+def test_recording_from_traces_timestamps_segment_count_mismatch():
+    """Too few/many ``timestamps`` arrays raises rather than silently
+    leaving segments on nominal times."""
+    traces = [np.ones((5, 2)), np.zeros((4, 2))]
+    times = [np.linspace(0.0, 0.04, 5)]  # only 1 array for 2 segments
+
+    with pytest.raises(ValueError, match="one array per segment"):
+        recording_from_traces(
+            traces, color="red", sampling_frequency=100.0, timestamps=times
+        )
 
 
 # ---------------- FiberPhotometryRecordingGroup ----------------

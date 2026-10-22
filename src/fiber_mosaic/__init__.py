@@ -16,6 +16,7 @@ from .core.base import (
     BaseFiberPhotometryExtractor,
     FiberPhotometryMixin,
     FiberPhotometryRecordingGroup,
+    recording_from_traces,
 )
 
 # Extractors - import directly for convenience
@@ -49,6 +50,7 @@ __all__ = [
     "BaseFiberPhotometryExtractor",
     "FiberPhotometryMixin",
     "FiberPhotometryRecordingGroup",
+    "recording_from_traces",
     # Format detection
     "detect_formats",
     # CSV
