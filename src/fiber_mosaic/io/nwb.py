@@ -42,32 +42,33 @@ def dump_group(
     folder: str | Path,
     prefix: str | None = None,
 ) -> dict[str, Path]:
-    """Write each color of ``group`` to its own SpikeInterface JSON file.
+    """Write each recording of ``group`` to its own SpikeInterface JSON file.
 
-    One file per color, each for its own ``FiberMosaicPhotometryInterface``;
-    combine those in NeuroConv's ``ConverterPipe`` to write one NWB file.
+    One file per recording, each for its own
+    ``FiberMosaicPhotometryInterface``; combine those in NeuroConv's
+    ``ConverterPipe`` to write one NWB file.
 
     Parameters
     ----------
     group : FiberPhotometryRecordingGroup
-        Recordings read from files on disk, one per color.
+        Recordings read from files on disk, keyed by name.
     folder : str or Path
         Existing folder to write the files into.
     prefix : str or None, default: None
-        Files are named ``{prefix}_{color}.json``. When None, each color uses
-        the name of its own raw source file (without extension).
+        Files are named ``{prefix}_{name}.json``. When None, each recording
+        uses the name of its own raw source file (without extension).
 
     Returns
     -------
     dict
-        Mapping from color to the JSON file written for it.
+        Mapping from name to the JSON file written for it.
     """
     return {
-        color: dump_recording(
+        name: dump_recording(
             recording,
-            Path(folder) / f"{prefix or _source_stem(recording)}_{color}.json",
+            Path(folder) / f"{prefix or _source_stem(recording)}_{name}.json",
         )
-        for color, recording in group.items()
+        for name, recording in group.items()
     }
 
 

@@ -1,7 +1,7 @@
 """NeuroConv interface writing a fiber-mosaic recording to NWB.
 
-Developed here first, to be moved into NeuroConv later. Covers one color,
-one fiber and at most one single-input processing step so far.
+Developed here first, to be moved into NeuroConv later. Covers flat
+processing (one raw reader per recording) of any number of fibers so far.
 """
 
 import numpy as np
@@ -27,12 +27,12 @@ class _RecordingPhotometryInterface(
     """Write one live recording as one ``FiberPhotometryResponseSeries``."""
 
     def __init__(
-        self, recording: BaseRecording, metadata_key: str, name: str
+        self, recording: BaseRecording, metadata_key: str, series_name: str
     ) -> None:
         self._recording = recording
-        self._name = name
+        self._series_name = series_name
         super().__init__(
-            stream_names=recording.get_annotation("color"),
+            stream_names=recording.name,
             metadata_key=metadata_key,
         )
 
@@ -45,7 +45,9 @@ class _RecordingPhotometryInterface(
     def get_metadata(self) -> dict:
         """Return the base metadata with this series' name filled in."""
         metadata = super().get_metadata()
-        metadata["FiberPhotometry"][self.metadata_key]["name"] = self._name
+        metadata["FiberPhotometry"][self.metadata_key]["name"] = (
+            self._series_name
+        )
         return metadata
 
 
@@ -61,15 +63,16 @@ def _writer(
 ) -> _RecordingPhotometryInterface:
     """Build the single-series writer for ``recording``.
 
-    One series per color, one column per fiber, so name and key carry the
-    color only. ``role`` ("raw" or "processed") ends the metadata key, so the
-    raw and processed series of one color read separate metadata entries.
+    One series per recording, one column per fiber, so series name and key
+    carry the recording's ``name`` only. ``role`` ("raw" or "processed")
+    ends the metadata key, so the raw and processed series of one recording
+    read separate metadata entries.
     """
-    color = recording.get_annotation("color")
+    label = recording.name
     return _RecordingPhotometryInterface(
         recording,
-        metadata_key=f"fiber_photometry_{color}_{role}",
-        name=f"FiberPhotometryResponseSeries{_camel(color)}{name_suffix}",
+        metadata_key=f"fiber_photometry_{label}_{role}",
+        series_name=f"FiberPhotometryResponseSeries{_camel(label)}{name_suffix}",
     )
 
 

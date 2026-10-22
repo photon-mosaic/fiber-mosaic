@@ -24,9 +24,9 @@ def test_dump_group_names_files_after_each_raw_source(group, tmp_path):
         "green": tmp_path / "green_green.json",
         "iso": tmp_path / "iso_iso.json",
     }
-    for color, path in paths.items():
+    for name, path in paths.items():
         np.testing.assert_array_equal(
-            si.load(path).get_traces(), group[color].get_traces()
+            si.load(path).get_traces(), group[name].get_traces()
         )
 
 
