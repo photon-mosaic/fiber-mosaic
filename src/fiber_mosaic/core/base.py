@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 
 import numpy as np
+from numpy.typing import ArrayLike
 from spikeinterface.core import BaseRecording
 from spikeinterface.core.numpyextractors import (
     NumpyRecording,
@@ -249,35 +250,15 @@ class _FiberNumpyRecording(FiberPhotometryMixin, NumpyRecording):
     """
 
 
-def _segment_t_start(times: np.ndarray) -> float:
-    """First-sample time as a scalar, for SI's per-segment ``t_start``.
-
-    Handles only the 1-D and 2-D shapes ``set_times`` itself supports (for
-    2-D, one column per fiber -- fiber 0's first sample stands in for the
-    segment's start, since ``t_start`` is a single SI-level scalar and
-    can't carry per-fiber jitter anyway), and returns 0.0 for anything
-    empty or any other shape rather than indexing into it -- checking
-    ``size`` before any indexing (instead of after, per-branch) means no
-    zero-length axis, in either dimension, can raise. Malformed input is
-    left for ``set_times`` (called right after construction, with the same
-    ``times``) to reject with its own clear error.
-    """
-    if times.size == 0 or times.ndim not in (1, 2):
-        return 0.0
-    return float(times[0] if times.ndim == 1 else times[0, 0])
-
-
 def _timestamps_per_segment(
     timestamps: ArrayLike | Sequence[ArrayLike], num_segments: int
 ) -> list[np.ndarray]:
     """Split ``timestamps`` into one array per segment.
 
-    With a single segment, ``timestamps`` is that segment's own array-like
-    (1-D or 2-D, plain list or ``np.ndarray``) taken as a whole -- not split
-    apart. With more than one, it's a sequence with one array-like per
-    segment. Deciding from ``num_segments`` rather than sniffing
-    ``timestamps``' own shape is what lets a single 2-D segment be passed as
-    nested lists without misreading it as one 1-D segment per row.
+    With a single segment, ``timestamps`` is that segment's 1-D array-like
+    (plain list or ``np.ndarray``); with more than one, a sequence with one
+    1-D array-like per segment. Deciding from ``num_segments`` rather than
+    from ``timestamps``' shape keeps a plain list of floats one segment.
     """
     if num_segments == 1:
         segments = [np.asarray(timestamps)]
@@ -295,7 +276,7 @@ def _timestamps_per_segment(
 def recording_from_traces(
     traces: np.ndarray | Sequence[np.ndarray],
     color: str,
-    sampling_frequency: float = 30.0,
+    sampling_frequency: float,
     fiber_ids: Sequence | None = None,
     timestamps: ArrayLike | Sequence[ArrayLike] | None = None,
 ) -> BaseRecording:
@@ -313,35 +294,30 @@ def recording_from_traces(
         array per segment.
     color : str
         Band label, e.g. ``"green"`` or ``"iso"``.
-    sampling_frequency : float, default: 30.0
-        Nominal acquisition rate in Hz, used for the SI time base. Still
-        required even when ``timestamps`` is given.
+    sampling_frequency : float
+        Nominal acquisition rate in Hz, used for the SI time base, also
+        when ``timestamps`` is given.
     fiber_ids : sequence or None, default: None
         Fiber IDs; defaults to ``"fiber_0" ... "fiber_n"``.
     timestamps : array-like or sequence of array-like, optional
-        Real per-sample timestamps, one array per segment matching
-        ``traces`` (a bare array-like for a single segment -- a plain list
-        is fine too). Passed to :meth:`~FiberPhotometryMixin.set_times`, so
-        each array may be 1-D (broadcast to all fibers) or 2-D (one column
-        per fiber); raises :exc:`ValueError` if the number of arrays
-        doesn't match ``traces``' segment count. Each segment's first
-        sample also becomes that segment's SI ``t_start``, so SI's own
-        (nominal, evenly-spaced) ``get_times()`` at least starts at the
-        right time instead of at zero; only
-        :meth:`~FiberPhotometryMixin.get_fiber_times` reflects the exact
-        supplied timestamps, e.g. under jitter. Omit ``timestamps`` to fall
-        back to nominal timestamps from `sampling_frequency`.
+        Per-sample timestamps in seconds, shared by all fibers: one 1-D
+        array per segment matching ``traces`` (a bare array-like for a
+        single segment; a plain list is fine too). Stored with SI's
+        ``set_times``, so ``get_times()`` returns them. Raises
+        :exc:`ValueError` if the number of arrays doesn't match ``traces``'
+        segment count. Omit to use nominal times from
+        ``sampling_frequency``, starting at 0.
 
     Returns
     -------
     BaseRecording
         A recording with the fiber-native API mixed in (``color``,
-        ``fiber_ids``, ``get_fluorescence()``, ``get_fiber_times()``, ...).
+        ``fiber_ids``, ``get_fluorescence()``, ...).
 
     Notes
     -----
     Built on spikeinterface's own :class:`~spikeinterface.core.NumpyRecording`
-    (multi-segment traces, dtype consistency, ``t_start``) with
+    (multi-segment traces, dtype consistency) with
     :class:`FiberPhotometryMixin` mixed in, rather than reimplementing that
     segment-handling here.
     """
@@ -354,15 +330,12 @@ def recording_from_traces(
     num_segments = 1 if isinstance(traces, np.ndarray) else len(traces)
 
     segments = None
-    t_starts = None
     if timestamps is not None:
         segments = _timestamps_per_segment(timestamps, num_segments)
-        t_starts = [_segment_t_start(times) for times in segments]
 
     recording = _FiberNumpyRecording(
         traces_list=traces,
         sampling_frequency=sampling_frequency,
-        t_starts=t_starts,
         channel_ids=list(fiber_ids),
     )
     recording.annotate(color=color)
