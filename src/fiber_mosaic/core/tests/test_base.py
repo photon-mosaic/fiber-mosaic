@@ -236,7 +236,7 @@ def test_recording_from_traces_without_timestamps():
 
     assert isinstance(rec, FiberPhotometryMixin)
     assert rec.color == "green"
-    assert not rec.has_fiber_times()
+    assert not rec.has_time_vector()
 
 
 @pytest.mark.parametrize(
@@ -248,44 +248,32 @@ def test_recording_from_traces_with_1d_timestamps(as_type):
     """A bare 1-D ``timestamps`` sets real times, single segment --
     whether given as an ``np.ndarray`` or a plain list."""
     traces = np.ones((10, 2), dtype="float32")
-    times = np.linspace(0.0, 0.09, 10) + 0.001  # jittery, not nominal
+    times = np.linspace(0.0, 0.09, 10) + 0.001  # offset, not nominal
 
     rec = recording_from_traces(
-        traces, color="green", timestamps=as_type(times)
+        traces,
+        color="green",
+        sampling_frequency=100.0,
+        timestamps=as_type(times),
     )
 
-    assert rec.has_fiber_times()
-    np.testing.assert_allclose(rec.get_fiber_times()[:, 0], times)
-    np.testing.assert_allclose(rec.get_fiber_times()[:, 1], times)
+    assert rec.has_time_vector()
+    np.testing.assert_allclose(rec.get_times(), times)
 
 
 def test_recording_from_traces_with_per_segment_timestamps():
     """A list of ``timestamps`` sets real times per segment."""
     traces = [np.ones((5, 2)), np.zeros((4, 2))]
-    times = [np.linspace(0.0, 0.04, 5), np.linspace(1.0, 1.03, 4)]
-
-    rec = recording_from_traces(traces, color="red", timestamps=times)
-
-    assert rec.has_fiber_times(segment_index=0)
-    assert rec.has_fiber_times(segment_index=1)
-    np.testing.assert_allclose(
-        rec.get_fiber_times(segment_index=1)[:, 0], times[1]
-    )
-
-
-def test_recording_from_traces_sets_si_t_start():
-    """Real ``timestamps`` also set SI's own per-segment ``t_start``.
-
-    So ``get_times()`` (the plain, nominal SI API) at least starts at the
-    right time instead of at zero.
-    """
-    traces = [np.ones((5, 2)), np.zeros((4, 2))]
     times = [np.linspace(1.0, 1.04, 5), np.linspace(2.0, 2.03, 4)]
 
-    rec = recording_from_traces(traces, color="red", timestamps=times)
+    rec = recording_from_traces(
+        traces, color="red", sampling_frequency=100.0, timestamps=times
+    )
 
-    np.testing.assert_allclose(rec.get_times(segment_index=0)[0], times[0][0])
-    np.testing.assert_allclose(rec.get_times(segment_index=1)[0], times[1][0])
+    for segment_index, segment_times in enumerate(times):
+        np.testing.assert_allclose(
+            rec.get_times(segment_index=segment_index), segment_times
+        )
 
 
 @pytest.mark.parametrize("container", [list, tuple])
@@ -293,7 +281,7 @@ def test_recording_from_traces_with_sequence_traces(container):
     """A sequence of per-segment arrays works as a list or a tuple."""
     traces = container([np.ones((5, 2)), np.zeros((4, 2))])
 
-    rec = recording_from_traces(traces, color="red")
+    rec = recording_from_traces(traces, color="red", sampling_frequency=100.0)
 
     assert rec.get_num_segments() == 2
     assert rec.get_num_samples(1) == 4
@@ -306,40 +294,9 @@ def test_recording_from_traces_timestamps_segment_count_mismatch():
     times = [np.linspace(0.0, 0.04, 5)]  # only 1 array for 2 segments
 
     with pytest.raises(ValueError, match="one array per segment"):
-        recording_from_traces(traces, color="red", timestamps=times)
-
-
-def test_recording_from_traces_with_nested_list_2d_timestamps():
-    """A single 2-D segment as nested lists isn't split into per-row
-    segments -- ``num_segments`` (from ``traces``), not ``timestamps``'
-    own shape, decides how it's read."""
-    traces = np.ones((3, 2), dtype="float32")
-    times = [[0.0, 0.001], [0.01, 0.011], [0.02, 0.021]]
-
-    rec = recording_from_traces(traces, color="green", timestamps=times)
-
-    assert rec.get_num_segments() == 1
-    np.testing.assert_allclose(rec.get_fiber_times(), times)
-
-
-@pytest.mark.parametrize(
-    "timestamps, match",
-    [
-        pytest.param(np.array([]), "must match", id="empty"),
-        pytest.param(np.zeros((5, 2, 1)), "1D or 2D", id="3d"),
-        pytest.param(np.zeros((5, 0)), "must match", id="2d_zero_columns"),
-    ],
-)
-def test_recording_from_traces_malformed_timestamps_raise_cleanly(
-    timestamps, match
-):
-    """Malformed ``timestamps`` (empty, wrong ndim, or a mismatched 2-D
-    shape) reach ``set_times``'s own clear errors, not a raw
-    ``IndexError``/``TypeError`` from computing ``t_start``."""
-    traces = np.ones((5, 2), dtype="float32")
-
-    with pytest.raises(ValueError, match=match):
-        recording_from_traces(traces, color="green", timestamps=timestamps)
+        recording_from_traces(
+            traces, color="red", sampling_frequency=100.0, timestamps=times
+        )
 
 
 # ---------------- FiberPhotometryRecordingGroup ----------------

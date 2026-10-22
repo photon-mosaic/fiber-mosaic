@@ -71,6 +71,7 @@ def test_simulate_group_and_recording_from_traces():
     multi = recording_from_traces(
         [np.ones((10, 2)), np.zeros((4, 2))],
         color="red",
+        sampling_frequency=30.0,
         fiber_ids=["a", "b"],
     )
     assert multi.get_num_segments() == 2
