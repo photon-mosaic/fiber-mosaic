@@ -203,8 +203,8 @@ def test_mixin_provides_fiber_api_off_a_plain_recording():
     assert "name=green" in repr(rec)
 
 
-def test_fiber_location_survives_json_round_trip(tmp_path):
-    """``fiber_location`` is kept by the default ``dump_to_json``."""
+def test_fiber_properties_survive_json_round_trip(tmp_path):
+    """Per-fiber NWB properties are kept by the default ``dump_to_json``."""
     times = np.arange(10) / 10.0
     csv_path = tmp_path / "rec.csv"
     np.savetxt(
@@ -217,12 +217,20 @@ def test_fiber_location_survives_json_round_trip(tmp_path):
     rec = CsvFiberPhotometryExtractor(
         csv_path, name="green", time_column="time"
     )
-    rec.set_property("fiber_location", ["DMS", "NAc"])
+    properties = {
+        "fiber_location": ["DMS", "NAc"],
+        "indicator": ["GCaMP6f", "dLight1.3b"],
+        "excitation_nm": [470.0, 470.0],
+        "emission_nm": [525.0, 525.0],
+    }
+    for key, values in properties.items():
+        rec.set_property(key, values)
 
     rec.dump_to_json(tmp_path / "rec.json")
     loaded = si.load(tmp_path / "rec.json")
 
-    assert list(loaded.get_property("fiber_location")) == ["DMS", "NAc"]
+    for key, values in properties.items():
+        assert list(loaded.get_property(key)) == values
 
 
 def test_name_survives_copy_metadata(recording):

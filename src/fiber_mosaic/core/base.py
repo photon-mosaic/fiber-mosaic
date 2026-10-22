@@ -141,23 +141,27 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
 
     Notes
     -----
-    Metadata for the NWB fiber table is set with SpikeInterface's own
-    methods, under these names:
+    Metadata for the NWB fiber table lives in per-fiber SpikeInterface
+    properties, one value per fiber, set with ``rec.set_property(name,
+    values)``:
 
-    - per fiber, the property ``fiber_location``: one brain-area string per
-      fiber, ``rec.set_property("fiber_location", ["DMS", "NAc"])``. The
-      name ``location`` is reserved by SpikeInterface for probe coordinates.
-    - per recording, the annotations ``excitation_nm`` and ``emission_nm``
-      (wavelengths in nanometres) and ``indicator`` (e.g. ``"GCaMP6f"``),
-      ``rec.annotate(excitation_nm=470, emission_nm=525,
-      indicator="GCaMP6f")``.
+    - ``fiber_location``: brain area, e.g. ``["DMS", "NAc"]``. The name
+      ``location`` is reserved by SpikeInterface for probe coordinates.
+    - ``indicator``: indicator label, e.g. ``["GCaMP6f", "dLight1.3b"]``.
+    - ``excitation_nm`` and ``emission_nm``: wavelengths in nanometres.
 
     All of them survive SpikeInterface processing steps and the
     ``dump_to_json`` round trip.
     """
 
     # SpikeInterface's default ``dump_to_json`` keeps only these properties.
-    _main_properties = [*BaseRecording._main_properties, "fiber_location"]
+    _main_properties = [
+        *BaseRecording._main_properties,
+        "fiber_location",
+        "indicator",
+        "excitation_nm",
+        "emission_nm",
+    ]
 
     def __init__(
         self,
