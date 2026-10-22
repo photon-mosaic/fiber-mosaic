@@ -1608,7 +1608,9 @@ def _mock_two_fiber_series(region):
     series.neurodata_type = "FiberPhotometryResponseSeries"
     series.data.__getitem__ = lambda self, x: np.zeros((10, 2))
     series.data.shape = (10, 2)
-    series.get_timestamps.return_value = np.arange(10) / 10.0
+    series.data.dtype = np.float64
+    series.timestamps = np.arange(10) / 10.0
+    series.get_timestamps.return_value = series.timestamps
     series.rate = 10.0
     series.fiber_photometry_table_region = region
     return series
@@ -1637,7 +1639,7 @@ def _read_nwb(series, tmp_path):
 
 
 class TestNwbFiberTableProperties:
-    """The NWB reader fills per-fiber properties from the fiber table."""
+    """NWB and DANDI readers fill per-fiber properties from the fiber table."""
 
     def test_all_columns_fill_all_properties(self, tmp_path):
         region = _fiber_table_region(
@@ -1673,6 +1675,35 @@ class TestNwbFiberTableProperties:
         rec = _read_nwb(_mock_two_fiber_series(None), tmp_path)
 
         assert rec.get_property("fiber_location") is None
+
+    def test_dandi_reader_fills_properties(self):
+        from fiber_mosaic.extractors import DandiFiberPhotometryExtractor
+
+        region = _fiber_table_region(
+            location=["DMS", "NAc"],
+            indicator=[SimpleNamespace(label="GCaMP6f")] * 2,
+            excitation_wavelength_in_nm=[470.0, 470.0],
+            emission_wavelength_in_nm=[525.0, 525.0],
+        )
+        series = _mock_two_fiber_series(region)
+        nwbfile = MagicMock()
+        nwbfile.objects.values.return_value = [series]
+
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"
+        ):
+            with patch(
+                "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+                return_value=(nwbfile, MagicMock()),
+            ):
+                rec = DandiFiberPhotometryExtractor(
+                    "dandi://000123/sub-1/file.nwb",
+                    series_name="FPSeries",
+                    name="green",
+                )
+
+        assert list(rec.get_property("fiber_location")) == ["DMS", "NAc"]
+        assert list(rec.get_property("emission_nm")) == [525.0, 525.0]
 
 
 class TestDANDIMock:

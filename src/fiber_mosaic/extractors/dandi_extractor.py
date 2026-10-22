@@ -15,6 +15,7 @@ from spikeinterface.core import BaseRecordingSegment
 from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
 from fiber_mosaic.extractors.nwb_extractor import (
     _discover_fiber_photometry_series,
+    _fiber_table_properties,
     _resolve_timing,
 )
 
@@ -340,6 +341,7 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
                 )
 
             series = series_dict[series_name]
+            properties = _fiber_table_properties(series)
 
             # Shape and dtype are HDF5 metadata — no data loaded here
             data_shape = series.data.shape
@@ -385,6 +387,8 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
         self.add_segment(segment)
         self.set_times(timestamps, with_warning=False)
+        for key, values in properties.items():
+            self.set_property(key, values)
 
         self._kwargs = {
             "dandi_uri": dandi_uri,
