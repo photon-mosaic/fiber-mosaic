@@ -35,12 +35,12 @@ class _Doubler:
 double = define_function_handling_group_from_class(_Doubler, "double")
 
 
-def _make_recording(color="green", fiber_ids=("f0", "f1")):
+def _make_recording(name="green", fiber_ids=("f0", "f1")):
     """Build a small single-segment recording."""
     rec = BaseFiberPhotometryExtractor(
         sampling_frequency=100.0,
         fiber_ids=list(fiber_ids),
-        color=color,
+        name=name,
         dtype="float32",
     )
     rec.add_segment(
@@ -98,7 +98,7 @@ def test_dispatch_on_empty_dict():
 
 
 def test_dispatch_on_group_returns_group():
-    """A group in, a new group out, with colors preserved in order."""
+    """A group in, a new group out, with names preserved in order."""
     green = _make_recording("green")
     iso = _make_recording("iso")
     group = FiberPhotometryRecordingGroup({"green": green, "iso": iso})
@@ -106,7 +106,7 @@ def test_dispatch_on_group_returns_group():
     result = double(group, factor=4)
 
     assert isinstance(result, FiberPhotometryRecordingGroup)
-    assert result.colors == ["green", "iso"]
+    assert result.names == ["green", "iso"]
     assert result["green"].recording is green
     assert result["iso"].factor == 4
 

@@ -129,8 +129,8 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     series_name : str, optional
         Name of the FiberPhotometryResponseSeries to read. If None and only
         one series exists, it will be used automatically.
-    color : str
-        Color/wavelength identifier (e.g. ``"green"``, ``"415nm"``).
+    name : str
+        Free-text label for this recording (e.g. ``"green"``, ``"415nm"``).
         Must be provided explicitly; NWB series names encode the
         experimental signal, not illumination color.
 
@@ -143,7 +143,7 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     >>> recording = NwbFiberPhotometryExtractor(
     ...     "session.nwb",
     ...     series_name="GCaMP_signal",
-    ...     color="green"
+    ...     name="green"
     ... )
     """
 
@@ -151,7 +151,7 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         self,
         file_path: str | Path,
         series_name: str | None = None,
-        color: str | None = None,
+        name: str | None = None,
     ):
         _check_pynwb()
 
@@ -203,9 +203,9 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
             else:
                 sampling_rate = 1.0
 
-        if color is None:
+        if name is None:
             raise ValueError(
-                "color must be provided explicitly (e.g. color='green'). "
+                "name must be provided explicitly (e.g. name='green'). "
                 "NWB series names encode the experimental signal "
                 "(e.g. 'GCaMP_signal'), not illumination color."
             )
@@ -214,7 +214,7 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         super().__init__(
             sampling_frequency=sampling_rate,
             fiber_ids=fiber_ids,
-            color=color,
+            name=name,
             dtype=data.dtype,
         )
 
@@ -224,7 +224,7 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         self._kwargs = {
             "file_path": str(nwb_path),
             "series_name": series_name,
-            "color": color,
+            "name": name,
         }
 
         logger.info(
@@ -268,7 +268,7 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 def read_nwb_fiber_photometry(
     file_path: str | Path,
     series_name: str | None = None,
-    color: str | None = None,
+    name: str | None = None,
 ) -> NwbFiberPhotometryExtractor:
     """
     Read fiber photometry data from an NWB file.
@@ -281,8 +281,8 @@ def read_nwb_fiber_photometry(
         Path to the NWB file or folder.
     series_name : str, optional
         Name of the FiberPhotometryResponseSeries to read.
-    color : str, optional
-        Color/wavelength identifier.
+    name : str, optional
+        Free-text label for this recording.
 
     Returns
     -------
@@ -292,5 +292,5 @@ def read_nwb_fiber_photometry(
     return NwbFiberPhotometryExtractor(
         file_path=file_path,
         series_name=series_name,
-        color=color,
+        name=name,
     )

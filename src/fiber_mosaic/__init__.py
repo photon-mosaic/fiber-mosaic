@@ -6,8 +6,8 @@ vocabulary and tools for working with fiber photometry recordings.
 
 Key concepts:
 - A "fiber" is analogous to a channel in electrophysiology
-- A "color" is a single-color recording (one BaseFiberPhotometryExtractor)
-- A FiberPhotometryRecordingGroup bundles multiple colors sharing fibers
+- A recording (one BaseFiberPhotometryExtractor) is labelled by its name
+- A FiberPhotometryRecordingGroup bundles named recordings sharing fibers
 """
 
 __version__ = "0.1.0"

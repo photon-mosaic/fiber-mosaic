@@ -4,8 +4,9 @@ Core classes for fiber photometry data handling.
 This module provides the base classes that form the foundation of fiber-mosaic:
 
 - FiberPhotometryMixin: The fiber-native API, mixable into any SI recording
-- BaseFiberPhotometryExtractor: A per-color recording (wraps SI BaseRecording)
-- FiberPhotometryRecordingGroup: A container for multiple colors sharing fibers
+- BaseFiberPhotometryExtractor: A single named recording (wraps SI
+  BaseRecording)
+- FiberPhotometryRecordingGroup: Named recordings sharing fibers
 """
 
 from __future__ import annotations
@@ -41,15 +42,11 @@ class FiberPhotometryMixin:
     ``get_annotation`` it relies. It defines no ``__init__``, so it never
     interferes with the host class's construction.
 
-    The color is read from the ``"color"`` annotation rather than from an
-    attribute, because ``copy_metadata`` propagates annotations but not
-    attributes -- so the color survives SpikeInterface preprocessing steps.
+    The recording's label is SpikeInterface's own ``name``, stored as the
+    ``"name"`` annotation rather than an attribute, because ``copy_metadata``
+    propagates annotations but not attributes -- so the name survives
+    SpikeInterface preprocessing steps.
     """
-
-    @property
-    def color(self) -> str:
-        """Return the color/wavelength identifier for this recording."""
-        return self.get_annotation("color")
 
     @property
     def fiber_ids(self) -> np.ndarray:
@@ -103,13 +100,13 @@ class FiberPhotometryMixin:
         )
 
     def __repr__(self) -> str:
-        """Return a one-line summary: class, color, fiber/segment count."""
+        """Return a one-line summary: class, name, fiber/segment count."""
         n_seg = self.get_num_segments()
         n_fib = self.get_num_fibers()
         sf = self.get_sampling_frequency()
         dtype = self.get_dtype()
         return (
-            f"{self.__class__.__name__} | color={self.color} | "
+            f"{self.__class__.__name__} | name={self.name} | "
             f"{n_fib} fiber(s) | {n_seg} segment(s) | "
             f"{sf:.1f} Hz | dtype: {dtype}"
         )
@@ -119,14 +116,16 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
     """
     Base class for fiber photometry recordings.
 
-    This class represents a single-color recording from a fiber photometry
-    experiment. It wraps SpikeInterface's BaseRecording, takes its
-    fiber-native API from FiberPhotometryMixin, and adds the source-side
-    concerns: construction, `get_streams()` for format-specific discovery of
-    available data streams, and segment loading.
+    This class represents a single recording from a fiber photometry
+    experiment, one excitation/emission channel. It wraps SpikeInterface's
+    BaseRecording, takes its fiber-native API from FiberPhotometryMixin,
+    and adds the source-side concerns: construction, `get_streams()` for
+    format-specific discovery of available data streams, and segment
+    loading.
 
-    Each color in an experiment should be its own BaseFiberPhotometryExtractor
-    instance, grouped together via FiberPhotometryRecordingGroup.
+    Each channel in an experiment (e.g. signal and isosbestic) should be its
+    own BaseFiberPhotometryExtractor instance, grouped together via
+    FiberPhotometryRecordingGroup.
 
     Parameters
     ----------
@@ -134,9 +133,9 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
         The nominal sampling frequency in Hz.
     fiber_ids : list or array-like
         Identifiers for each fiber (will be used as channel_ids internally).
-    color : str
-        The color/wavelength identifier for this recording
-        (e.g., "green", "red", "iso").
+    name : str
+        Free-text label for this recording (e.g. "470nm", "GCaMP6f",
+        "iso"), stored as SpikeInterface's ``name``.
     dtype : dtype, optional
         The data type of the traces. Default is float64.
     """
@@ -145,7 +144,7 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
         self,
         sampling_frequency: float,
         fiber_ids: Sequence,
-        color: str,
+        name: str,
         dtype: np.dtype = np.float64,
     ):
         # Pass fiber_ids as channel_ids to SI's BaseRecording
@@ -155,14 +154,14 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
             channel_ids=list(fiber_ids),
             dtype=dtype,
         )
-        # Store the color as an annotation, not an attribute, so that
-        # copy_metadata carries it across SpikeInterface preprocessing steps.
-        self.annotate(color=color)
+        # SpikeInterface stores the name as an annotation, not an attribute,
+        # so copy_metadata carries it across preprocessing steps.
+        self.name = name
         # Store kwargs for serialization
         self._kwargs = {
             "sampling_frequency": sampling_frequency,
             "fiber_ids": list(fiber_ids),
-            "color": color,
+            "name": name,
             "dtype": str(dtype),
         }
 
@@ -238,26 +237,26 @@ class FiberPhotometryRecordingGroup:
     """
     A container for multiple fiber photometry recordings sharing fibers.
 
-    This class groups several per-color recordings
+    This class groups several named recordings
     (BaseFiberPhotometryExtractor instances) that share the same fiber
     layout but may have different timebases or sample counts.
 
-    This is NOT a BaseRecording because the colors can have different
+    This is NOT a BaseRecording because the recordings can have different
     timebases, so there's no single trace matrix to return.
 
     Parameters
     ----------
     recordings : dict
-        A dictionary mapping color names to
+        A dictionary mapping names to
         BaseFiberPhotometryExtractor instances. All recordings must have
         identical fiber_ids in the same order.
 
     Examples
     --------
-    >>> green = CsvFiberPhotometryExtractor("green.csv", color="green")
-    >>> iso = CsvFiberPhotometryExtractor("iso.csv", color="iso")
+    >>> green = CsvFiberPhotometryExtractor("green.csv", name="green")
+    >>> iso = CsvFiberPhotometryExtractor("iso.csv", name="iso")
     >>> group = FiberPhotometryRecordingGroup({"green": green, "iso": iso})
-    >>> group.colors
+    >>> group.names
     ['green', 'iso']
     >>> group["green"].get_fluorescence()
     """
@@ -275,19 +274,19 @@ class FiberPhotometryRecordingGroup:
             tuple(rec.get_channel_ids()) for rec in self._recordings.values()
         ]
         reference = fiber_ids_list[0]
-        for color, fiber_ids in zip(
+        for name, fiber_ids in zip(
             self._recordings.keys(), fiber_ids_list, strict=True
         ):
             if fiber_ids != reference:
                 raise ValueError(
-                    f"Recording '{color}' has different fiber_ids "
+                    f"Recording '{name}' has different fiber_ids "
                     f"than the first recording. All recordings must "
                     f"share identical fiber_ids in the same order."
                 )
 
     @property
-    def colors(self) -> list[str]:
-        """Return the list of color names in this group."""
+    def names(self) -> list[str]:
+        """Return the list of names in this group."""
         return list(self._recordings.keys())
 
     @property
@@ -300,41 +299,41 @@ class FiberPhotometryRecordingGroup:
         """Return the number of fibers shared by all recordings."""
         return len(self.fiber_ids)
 
-    def get_recording(self, color: str) -> BaseRecording:
+    def get_recording(self, name: str) -> BaseRecording:
         """
-        Get the recording for a specific color.
+        Get the recording for a specific name.
 
         Parameters
         ----------
-        color : str
-            The color name.
+        name : str
+            The recording's key in the group.
 
         Returns
         -------
         BaseRecording
-            The recording for the specified color.
+            The recording for the specified name.
         """
-        return self._recordings[color]
+        return self._recordings[name]
 
     # Dict-like access
-    def __getitem__(self, color: str) -> BaseRecording:
-        """Return the recording for a specific color."""
-        return self._recordings[color]
+    def __getitem__(self, name: str) -> BaseRecording:
+        """Return the recording for a specific name."""
+        return self._recordings[name]
 
-    def __contains__(self, color: str) -> bool:
-        """Check if a color exists in this group."""
-        return color in self._recordings
+    def __contains__(self, name: str) -> bool:
+        """Check if a name exists in this group."""
+        return name in self._recordings
 
     def __len__(self) -> int:
-        """Return the number of colors in this group."""
+        """Return the number of recordings in this group."""
         return len(self._recordings)
 
     def __iter__(self) -> Iterable[str]:
-        """Iterate over color names in this group."""
+        """Iterate over the names in this group."""
         return iter(self._recordings)
 
     def keys(self):
-        """Return the color names in this group."""
+        """Return the names in this group."""
         return self._recordings.keys()
 
     def values(self):
@@ -342,15 +341,15 @@ class FiberPhotometryRecordingGroup:
         return self._recordings.values()
 
     def items(self):
-        """Return (color, recording) pairs in this group."""
+        """Return (name, recording) pairs in this group."""
         return self._recordings.items()
 
     def __repr__(self) -> str:
-        """Return a multi-line summary listing each per-color recording."""
+        """Return a multi-line summary listing each named recording."""
         lines = [
             f"{self.__class__.__name__} | "
-            f"{self.get_num_fibers()} fiber(s), {len(self)} color(s)"
+            f"{self.get_num_fibers()} fiber(s), {len(self)} recording(s)"
         ]
-        for color, rec in self._recordings.items():
-            lines.append(f"  [{color}] {rec!r}")
+        for name, rec in self._recordings.items():
+            lines.append(f"  [{name}] {rec!r}")
         return "\n".join(lines)
