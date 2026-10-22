@@ -78,8 +78,8 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     ----------
     file_path : str or Path
         Path to the CSV file.
-    color : str
-        Color/wavelength identifier for this recording (e.g., "green", "iso").
+    name : str
+        Free-text label for this recording (e.g., "green", "iso").
     time_column : str
         Name of the timestamp column. Matched exactly against the CSV
         headers (e.g. ``"time"``, ``"timestamps"``, ``"Time(s)"``).
@@ -108,12 +108,12 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     Examples
     --------
     >>> recording = CsvFiberPhotometryExtractor(
-    ...     "data.csv", color="green", time_column="time"
+    ...     "data.csv", name="green", time_column="time"
     ... )
     >>> recording.get_fluorescence()
     >>> # AIND FIP file: select only the fiber channels
     >>> fip = CsvFiberPhotometryExtractor(
-    ...     "green.csv", color="green",
+    ...     "green.csv", name="green",
     ...     time_column="ReferenceTime", fiber_pattern="Fiber_*",
     ... )
     """
@@ -121,7 +121,7 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     def __init__(
         self,
         file_path: str | Path,
-        color: str,
+        name: str,
         time_column: str,
         fiber_columns: list[str] | None = None,
         fiber_pattern: str | None = None,
@@ -174,7 +174,7 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         super().__init__(
             sampling_frequency=sampling_frequency,
             fiber_ids=fiber_columns,
-            color=color,
+            name=name,
             dtype=traces.dtype,
         )
 
@@ -183,7 +183,7 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         # Store kwargs for serialization
         self._kwargs = {
             "file_path": str(file_path),
-            "color": color,
+            "name": name,
             "time_column": time_col,
             "fiber_columns": list(fiber_columns),
             "sampling_frequency": sampling_frequency,
@@ -249,7 +249,7 @@ class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
 def read_csv_fiber_photometry(
     file_path: str | Path,
-    color: str,
+    name: str,
     time_column: str,
     fiber_columns: list[str] | None = None,
     fiber_pattern: str | None = None,
@@ -264,8 +264,8 @@ def read_csv_fiber_photometry(
     ----------
     file_path : str or Path
         Path to the CSV file.
-    color : str
-        Color/wavelength identifier for this recording.
+    name : str
+        Free-text label for this recording.
     time_column : str
         Name of the timestamp column.
     fiber_columns : list of str, optional
@@ -284,13 +284,13 @@ def read_csv_fiber_photometry(
     Examples
     --------
     >>> rec = read_csv_fiber_photometry(
-    ...     "green_channel.csv", color="green", time_column="time"
+    ...     "green_channel.csv", name="green", time_column="time"
     ... )
     >>> rec.get_fluorescence()
     """
     return CsvFiberPhotometryExtractor(
         file_path=file_path,
-        color=color,
+        name=name,
         time_column=time_column,
         fiber_columns=fiber_columns,
         fiber_pattern=fiber_pattern,

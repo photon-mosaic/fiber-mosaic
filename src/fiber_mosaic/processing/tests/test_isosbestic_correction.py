@@ -10,13 +10,13 @@ from fiber_mosaic.processing import isosbestic_correction
 
 
 def _make_recording(
-    color: str, levels: list[float], n_segments: int = 2
+    name: str, levels: list[float], n_segments: int = 2
 ) -> BaseFiberPhotometryExtractor:
     """Build a recording holding a constant level per fiber."""
     recording = BaseFiberPhotometryExtractor(
         sampling_frequency=100.0,
         fiber_ids=[f"f{index}" for index in range(len(levels))],
-        color=color,
+        name=name,
     )
     for _ in range(n_segments):
         recording.add_segment(

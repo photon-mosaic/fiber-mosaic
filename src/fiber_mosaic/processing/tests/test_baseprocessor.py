@@ -43,7 +43,7 @@ FILTER_KWARGS = {"freq_min": 1.0, "freq_max": 20.0}
 
 
 def _make_recording(
-    color="green",
+    name="green",
     fiber_ids=("f0", "f1", "f2"),
     n_samples=500,
     n_segments=1,
@@ -54,7 +54,7 @@ def _make_recording(
     rec = BaseFiberPhotometryExtractor(
         sampling_frequency=sampling_frequency,
         fiber_ids=list(fiber_ids),
-        color=color,
+        name=name,
         dtype="float32",
     )
     rng = np.random.default_rng(0)
@@ -103,13 +103,13 @@ def test_wrapped_class_keeps_the_fiber_api():
     rec = _make_recording()
     filtered = bandpass_filter(rec, **FILTER_KWARGS)
 
-    assert filtered.color == "green"
+    assert filtered.name == "green"
     assert filtered.get_num_fibers() == 3
     np.testing.assert_array_equal(
         filtered.get_fiber_ids(), rec.get_fiber_ids()
     )
     assert filtered.get_fluorescence().shape == (500, 3)
-    assert "color=green" in repr(filtered)
+    assert "name=green" in repr(filtered)
 
 
 def test_wrapped_class_stays_lazy():
@@ -249,7 +249,7 @@ def test_own_preprocessor_keeps_fiber_api_and_computes():
     rec = _make_recording()
     gained = _GainRecording(rec, gain=3.0)
 
-    assert gained.color == "green"
+    assert gained.name == "green"
     assert gained.get_num_fibers() == 3
     np.testing.assert_allclose(
         gained.get_fluorescence(), rec.get_fluorescence() * 3.0
@@ -280,7 +280,7 @@ def test_own_preprocessor_can_override_fibers_and_dtype():
 
 
 def test_public_function_dispatches_over_a_group():
-    """A step applied to a group returns a group of processed colors."""
+    """A step applied to a group returns a group of processed recordings."""
     green = _make_recording("green")
     iso = _make_recording("iso")
     group = FiberPhotometryRecordingGroup({"green": green, "iso": iso})
@@ -288,13 +288,13 @@ def test_public_function_dispatches_over_a_group():
     filtered = bandpass_filter(group, **FILTER_KWARGS)
 
     assert isinstance(filtered, FiberPhotometryRecordingGroup)
-    assert filtered.colors == ["green", "iso"]
-    assert filtered["green"].color == "green"
-    assert filtered["iso"].color == "iso"
+    assert filtered.names == ["green", "iso"]
+    assert filtered["green"].name == "green"
+    assert filtered["iso"].name == "iso"
 
 
 def test_public_function_dispatches_over_a_dict():
-    """A dict of colors maps to a dict of processed recordings."""
+    """A dict of named recordings maps to a dict of processed recordings."""
     recordings = {"green": _make_recording("green")}
     filtered = bandpass_filter(recordings, **FILTER_KWARGS)
 

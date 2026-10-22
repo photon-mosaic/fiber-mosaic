@@ -4,6 +4,7 @@ Tests for fiber-mosaic extractors.
 
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -35,13 +36,13 @@ class TestCsvExtractor:
         try:
             # Load with extractor
             rec = CsvFiberPhotometryExtractor(
-                csv_path, color="green", time_column="time"
+                csv_path, name="green", time_column="time"
             )
 
             # Verify basic properties
             assert rec.get_num_fibers() == 2
             assert rec.get_num_samples() == 100
-            assert rec.color == "green"
+            assert rec.name == "green"
             assert list(rec.fiber_ids) == ["fiber1", "fiber2"]
 
             # Verify data access
@@ -119,7 +120,7 @@ class TestCsvExtractor:
         try:
             rec = CsvFiberPhotometryExtractor(
                 csv_path,
-                color="green",
+                name="green",
                 time_column="ReferenceTime",
                 fiber_pattern="Fiber_*",
             )
@@ -145,7 +146,7 @@ class TestCsvExtractor:
             with pytest.raises(ValueError, match="matched no columns"):
                 CsvFiberPhotometryExtractor(
                     csv_path,
-                    color="green",
+                    name="green",
                     time_column="time",
                     fiber_pattern="Fiber_*",
                 )
@@ -179,7 +180,7 @@ class TestCsvExtractor:
 
         with pytest.raises(FileNotFoundError, match="not found"):
             CsvFiberPhotometryExtractor(
-                "/nonexistent/file.csv", color="green", time_column="time"
+                "/nonexistent/file.csv", name="green", time_column="time"
             )
 
     def test_csv_extractor_no_time_column(self):
@@ -198,7 +199,7 @@ class TestCsvExtractor:
                 ValueError, match="Time column 'time' not found"
             ):
                 CsvFiberPhotometryExtractor(
-                    csv_path, color="green", time_column="time"
+                    csv_path, name="green", time_column="time"
                 )
         finally:
             Path(csv_path).unlink()
@@ -217,7 +218,7 @@ class TestCsvExtractor:
         try:
             with pytest.raises(ValueError, match="No fiber columns found"):
                 CsvFiberPhotometryExtractor(
-                    csv_path, color="green", time_column="time"
+                    csv_path, name="green", time_column="time"
                 )
         finally:
             Path(csv_path).unlink()
@@ -237,7 +238,7 @@ class TestCsvExtractor:
             with pytest.raises(ValueError, match="not found in CSV"):
                 CsvFiberPhotometryExtractor(
                     csv_path,
-                    color="green",
+                    name="green",
                     time_column="time",
                     fiber_columns=["nonexistent"],
                 )
@@ -258,7 +259,7 @@ class TestCsvExtractor:
         try:
             with pytest.raises(ValueError, match="Cannot compute"):
                 CsvFiberPhotometryExtractor(
-                    csv_path, color="green", time_column="time"
+                    csv_path, name="green", time_column="time"
                 )
         finally:
             Path(csv_path).unlink()
@@ -277,7 +278,7 @@ class TestCsvExtractor:
         try:
             rec = CsvFiberPhotometryExtractor(
                 csv_path,
-                color="green",
+                name="green",
                 time_column="time",
                 sampling_frequency=100.0,
             )
@@ -303,12 +304,12 @@ class TestCsvExtractor:
                 ValueError, match="Time column 'time' not found"
             ):
                 CsvFiberPhotometryExtractor(
-                    csv_path, color="green", time_column="time"
+                    csv_path, name="green", time_column="time"
                 )
 
             # Correct column name works.
             rec = CsvFiberPhotometryExtractor(
-                csv_path, color="green", time_column="timestamps"
+                csv_path, name="green", time_column="timestamps"
             )
             assert rec.get_num_samples() == 2
         finally:
@@ -330,7 +331,7 @@ class TestCsvExtractor:
 
         try:
             rec = read_csv_fiber_photometry(
-                csv_path, color="green", time_column="time"
+                csv_path, name="green", time_column="time"
             )
             assert rec.get_num_samples() == 2
         finally:
@@ -362,7 +363,7 @@ class TestBaseFiberPhotometryExtractor:
         rec = TestExtractor(
             sampling_frequency=100.0,
             fiber_ids=["f1", "f2"],
-            color="green",
+            name="green",
         )
         assert list(rec.get_fiber_ids()) == ["f1", "f2"]
 
@@ -373,7 +374,7 @@ class TestBaseFiberPhotometryExtractor:
 
 
 class TestFiberPhotometryRecordingGroup:
-    """Tests for multi-color recording group."""
+    """Tests for the multi-recording group."""
 
     def test_group_creation(self):
         """Test creating a recording group."""
@@ -395,7 +396,7 @@ class TestFiberPhotometryRecordingGroup:
         green = TestExtractor(
             sampling_frequency=sampling_rate,
             fiber_ids=fiber_ids,
-            color="green",
+            name="green",
         )
         green.add_segment(
             NumpyRecordingSegment(
@@ -406,7 +407,7 @@ class TestFiberPhotometryRecordingGroup:
         iso = TestExtractor(
             sampling_frequency=sampling_rate,
             fiber_ids=fiber_ids,
-            color="iso",
+            name="iso",
         )
         iso.add_segment(
             NumpyRecordingSegment(
@@ -418,7 +419,7 @@ class TestFiberPhotometryRecordingGroup:
         group = FiberPhotometryRecordingGroup({"green": green, "iso": iso})
 
         # Verify properties
-        assert group.colors == ["green", "iso"]
+        assert group.names == ["green", "iso"]
         assert list(group.fiber_ids) == fiber_ids
         assert group.get_num_fibers() == 2
         assert len(group) == 2
@@ -443,7 +444,7 @@ class TestFiberPhotometryRecordingGroup:
         rec1 = TestExtractor(
             sampling_frequency=100.0,
             fiber_ids=["f1", "f2"],
-            color="green",
+            name="green",
         )
         rec1.add_segment(
             NumpyRecordingSegment(np.zeros((10, 2)), 100.0, t_start=0.0)
@@ -452,7 +453,7 @@ class TestFiberPhotometryRecordingGroup:
         rec2 = TestExtractor(
             sampling_frequency=100.0,
             fiber_ids=["f3", "f4"],  # Different fibers!
-            color="iso",
+            name="iso",
         )
         rec2.add_segment(
             NumpyRecordingSegment(np.zeros((10, 2)), 100.0, t_start=0.0)
@@ -469,7 +470,7 @@ class TestFiberPhotometryRecordingGroup:
             FiberPhotometryRecordingGroup({})
 
     def test_group_iteration(self):
-        """Test iterating over group colors."""
+        """Test iterating over group names."""
         from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
         from fiber_mosaic import (
@@ -483,7 +484,7 @@ class TestFiberPhotometryRecordingGroup:
         rec = TestExtractor(
             sampling_frequency=100.0,
             fiber_ids=["f1"],
-            color="green",
+            name="green",
         )
         rec.add_segment(
             NumpyRecordingSegment(np.zeros((10, 1)), 100.0, t_start=0.0)
@@ -492,8 +493,8 @@ class TestFiberPhotometryRecordingGroup:
         group = FiberPhotometryRecordingGroup({"green": rec})
 
         # Test iteration
-        colors = list(group)
-        assert colors == ["green"]
+        names = list(group)
+        assert names == ["green"]
 
         # Test keys/values/items
         assert list(group.keys()) == ["green"]
@@ -515,7 +516,7 @@ class TestFiberPhotometryRecordingGroup:
         rec = TestExtractor(
             sampling_frequency=100.0,
             fiber_ids=["f1", "f2"],
-            color="green",
+            name="green",
         )
         rec.add_segment(
             NumpyRecordingSegment(np.zeros((10, 2)), 100.0, t_start=0.0)
@@ -525,7 +526,7 @@ class TestFiberPhotometryRecordingGroup:
         repr_str = repr(group)
 
         assert "FiberPhotometryRecordingGroup" in repr_str
-        assert "1 color(s)" in repr_str
+        assert "1 recording(s)" in repr_str
         assert "2 fiber(s)" in repr_str
         assert "[green]" in repr_str
 
@@ -699,10 +700,10 @@ class TestDoricExtractor:
             )
 
             rec = DoricFiberPhotometryExtractor(
-                csv_path, stream_name="Signal", color="green"
+                csv_path, stream_name="Signal", name="green"
             )
             assert rec.get_num_samples() == 3
-            assert rec.color == "green"
+            assert rec.name == "green"
 
     def test_doric_csv_auto_stream(self):
         """Test auto stream selection with single stream."""
@@ -715,11 +716,11 @@ class TestDoricExtractor:
                 "Console,Signal\nTime(s),Signal\n0.0,100.0\n0.1,101.0\n"
             )
 
-            rec = DoricFiberPhotometryExtractor(csv_path, color="green")
+            rec = DoricFiberPhotometryExtractor(csv_path, name="green")
             assert rec.get_num_samples() == 2
 
     def test_doric_no_color_raises(self):
-        """Test that omitting color raises a ValueError."""
+        """Test that omitting name raises a ValueError."""
         from fiber_mosaic.extractors import DoricFiberPhotometryExtractor
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -728,7 +729,7 @@ class TestDoricExtractor:
                 "Console,Signal\nTime(s),Signal\n0.0,100.0\n0.1,101.0\n"
             )
 
-            with pytest.raises(ValueError, match="color must be provided"):
+            with pytest.raises(ValueError, match="name must be provided"):
                 DoricFiberPhotometryExtractor(csv_path)
 
     def test_doric_csv_no_streams(self):
@@ -798,7 +799,7 @@ class TestDoricExtractor:
             # Single stream so auto-selection works
             csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
 
-            rec = DoricFiberPhotometryExtractor(tmpdir, color="green")
+            rec = DoricFiberPhotometryExtractor(tmpdir, name="green")
             assert rec.get_num_samples() == 1
 
     def test_doric_folder_no_files(self):
@@ -820,7 +821,7 @@ class TestDoricExtractor:
             # Single stream so auto-selection works
             csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
 
-            rec = read_doric_fiber_photometry(csv_path, color="green")
+            rec = read_doric_fiber_photometry(csv_path, name="green")
             assert rec.get_num_samples() == 1
 
     @patch("fiber_mosaic.extractors.doric_extractor.HAVE_H5PY", False)
@@ -855,10 +856,10 @@ class TestNpmExtractor:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1", color="iso"
+                csv_path, stream_name="Region0G_led1", name="iso"
             )
             assert rec.get_num_samples() == 2
-            assert rec.color == "iso"
+            assert rec.name == "iso"
 
     def test_npm_extractor_auto_stream(self):
         """Test auto stream selection fails with multiple streams."""
@@ -936,7 +937,7 @@ class TestNpmExtractor:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1", color="green"
+                csv_path, stream_name="Region0G_led1", name="green"
             )
             times = rec.get_times()
             # Converted to seconds: 0, 0.025, 0.05, 0.075
@@ -958,7 +959,7 @@ class TestNpmExtractor:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1", color="green"
+                csv_path, stream_name="Region0G_led1", name="green"
             )
             times = rec.get_times()
             np.testing.assert_allclose(times, [0.0, 0.025, 0.05, 0.075])
@@ -982,7 +983,7 @@ class TestNpmExtractor:
             rec = NpmFiberPhotometryExtractor(
                 csv_path,
                 stream_name="Region0G_led1",
-                color="green",
+                name="green",
                 timestamp_unit="ms",
             )
             times = rec.get_times()
@@ -1009,7 +1010,7 @@ class TestNpmExtractor:
             rec = NpmFiberPhotometryExtractor(
                 csv_path,
                 stream_name="Region0G_led1",
-                color="green",
+                name="green",
                 timestamp_unit="s",
             )
             times = rec.get_times()
@@ -1041,19 +1042,19 @@ class TestNpmExtractor:
             csv_path.write_text("LedState,Region0G\n1,100.0\n1,101.0\n")
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1", color="green"
+                csv_path, stream_name="Region0G_led1", name="green"
             )
             assert rec.get_num_samples() == 2
 
     def test_npm_color_required(self):
-        """Test that omitting color raises ValueError."""
+        """Test that omitting name raises ValueError."""
         from fiber_mosaic.extractors import NpmFiberPhotometryExtractor
 
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = Path(tmpdir) / "npm_data.csv"
             csv_path.write_text("Timestamp,LedState,Region0G\n0,1,100.0\n")
 
-            with pytest.raises(ValueError, match="color must be provided"):
+            with pytest.raises(ValueError, match="name must be provided"):
                 NpmFiberPhotometryExtractor(
                     csv_path, stream_name="Region0G_led1"
                 )
@@ -1069,7 +1070,7 @@ class TestNpmExtractor:
             csv_path.write_text("Timestamp,LedState,Region0G\n0,1,100.0\n")
 
             rec = read_npm_fiber_photometry(
-                csv_path, stream_name="Region0G_led1", color="green"
+                csv_path, stream_name="Region0G_led1", name="green"
             )
             assert rec.get_num_samples() == 1
 
@@ -1082,7 +1083,7 @@ class TestNpmExtractor:
             csv_path.write_text("Timestamp,Region0G\n0,100.0\n10,101.0\n")
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led0", color="green"
+                csv_path, stream_name="Region0G_led0", name="green"
             )
             assert rec.get_num_samples() == 2
 
@@ -1117,7 +1118,7 @@ class TestNpmHeaderlessFiles:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led0", color="green"
+                csv_path, stream_name="Region0G_led0", name="green"
             )
             assert rec.get_num_samples() == 3
             traces = rec.get_fluorescence().ravel()
@@ -1139,7 +1140,7 @@ class TestNpmHeaderlessFiles:
             assert names == ["Region0G_led0", "Region1G_led0"]
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led0", color="green"
+                csv_path, stream_name="Region0G_led0", name="green"
             )
             # Falls back to frame-index timestamps.
             assert rec.get_times().tolist() == [0.0, 1.0, 2.0]
@@ -1320,7 +1321,7 @@ class TestAdditionalCoverage:
                 csv_path.write_text(f"{time_col},data\n0.0,1.0\n0.1,2.0\n")
 
                 rec = CsvFiberPhotometryExtractor(
-                    csv_path, color="green", time_column=time_col
+                    csv_path, name="green", time_column=time_col
                 )
                 assert rec.get_num_samples() == 2
 
@@ -1336,7 +1337,7 @@ class TestAdditionalCoverage:
 
             rec = CsvFiberPhotometryExtractor(
                 csv_path,
-                color="green",
+                name="green",
                 time_column="time",
                 fiber_columns=["fiber1", "fiber2"],
             )
@@ -1400,7 +1401,7 @@ class TestAdditionalCoverage:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1", color="green"
+                csv_path, stream_name="Region0G_led1", name="green"
             )
             assert rec.get_num_samples() == 2
 
@@ -1415,7 +1416,7 @@ class TestAdditionalCoverage:
             )
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1", color="green"
+                csv_path, stream_name="Region0G_led1", name="green"
             )
             assert rec.get_num_samples() == 2
 
@@ -1428,7 +1429,7 @@ class TestAdditionalCoverage:
             csv_path.write_text("Timestamp,LedState,Region0G\n0,1,100.0\n")
 
             rec = NpmFiberPhotometryExtractor(
-                csv_path, stream_name="Region0G_led1", color="green"
+                csv_path, stream_name="Region0G_led1", name="green"
             )
             assert rec.get_num_samples() == 1
 
@@ -1441,7 +1442,7 @@ class TestAdditionalCoverage:
             # Single stream (Signal) for auto-selection
             csv_path.write_text("Console,Signal\nTime(s),Signal\n0.0,100.0\n")
 
-            rec = DoricFiberPhotometryExtractor(csv_path, color="green")
+            rec = DoricFiberPhotometryExtractor(csv_path, name="green")
             assert rec.get_num_samples() == 1
 
     def test_doric_find_files_in_folder(self):
@@ -1583,8 +1584,126 @@ class TestNWBMock:
                         NwbFiberPhotometryExtractor(
                             str(nwb_path),
                             series_name="FPSeries",
-                            color="green",
+                            name="green",
                         )
+
+
+class _FakeFiberTable(dict):
+    """Fiber table stand-in: ``table[column][row]`` and ``colnames``."""
+
+    @property
+    def colnames(self):
+        return tuple(self)
+
+
+def _fiber_table_region(**columns):
+    """Region pointing at rows 0 and 1 of a fake fiber table."""
+    return SimpleNamespace(data=[0, 1], table=_FakeFiberTable(columns))
+
+
+def _mock_two_fiber_series(region):
+    """Readable mock series with two fibers and the given table region."""
+    series = MagicMock()
+    series.name = "FPSeries"
+    series.neurodata_type = "FiberPhotometryResponseSeries"
+    series.data.__getitem__ = lambda self, x: np.zeros((10, 2))
+    series.data.shape = (10, 2)
+    series.data.dtype = np.float64
+    series.timestamps = np.arange(10) / 10.0
+    series.get_timestamps.return_value = series.timestamps
+    series.rate = 10.0
+    series.fiber_photometry_table_region = region
+    return series
+
+
+def _read_nwb(series, tmp_path):
+    """Read ``series`` through ``NwbFiberPhotometryExtractor``, mocked."""
+    from fiber_mosaic.extractors import NwbFiberPhotometryExtractor
+
+    nwb_path = tmp_path / "session.nwb"
+    nwb_path.touch()
+    nwbfile = MagicMock()
+    nwbfile.objects.values.return_value = [series]
+    io = MagicMock()
+    io.read.return_value = nwbfile
+    io.__enter__ = MagicMock(return_value=io)
+    io.__exit__ = MagicMock(return_value=False)
+    with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
+        with patch(
+            "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+            return_value=io,
+        ):
+            return NwbFiberPhotometryExtractor(
+                str(nwb_path), series_name="FPSeries", name="green"
+            )
+
+
+class TestNwbFiberTableProperties:
+    """NWB and DANDI readers fill per-fiber properties from the fiber table."""
+
+    def test_all_columns_fill_all_properties(self, tmp_path):
+        region = _fiber_table_region(
+            location=["DMS", "NAc"],
+            indicator=[
+                SimpleNamespace(label="GCaMP6f"),
+                SimpleNamespace(label="dLight1.3b"),
+            ],
+            excitation_wavelength_in_nm=[470.0, 470.0],
+            emission_wavelength_in_nm=[525.0, 525.0],
+        )
+
+        rec = _read_nwb(_mock_two_fiber_series(region), tmp_path)
+
+        assert list(rec.get_property("fiber_location")) == ["DMS", "NAc"]
+        assert list(rec.get_property("indicator")) == ["GCaMP6f", "dLight1.3b"]
+        assert list(rec.get_property("excitation_nm")) == [470.0, 470.0]
+        assert list(rec.get_property("emission_nm")) == [525.0, 525.0]
+
+    def test_missing_columns_leave_properties_unset(self, tmp_path):
+        region = _fiber_table_region(
+            location=["VTA", "VTA"],
+            indicator=[SimpleNamespace(label="GCaMP6f")] * 2,
+        )
+
+        rec = _read_nwb(_mock_two_fiber_series(region), tmp_path)
+
+        assert list(rec.get_property("fiber_location")) == ["VTA", "VTA"]
+        assert list(rec.get_property("indicator")) == ["GCaMP6f", "GCaMP6f"]
+        assert rec.get_property("excitation_nm") is None
+
+    def test_series_without_region_sets_nothing(self, tmp_path):
+        rec = _read_nwb(_mock_two_fiber_series(None), tmp_path)
+
+        assert rec.get_property("fiber_location") is None
+
+    def test_dandi_reader_fills_properties(self):
+        from fiber_mosaic.extractors import DandiFiberPhotometryExtractor
+
+        region = _fiber_table_region(
+            location=["DMS", "NAc"],
+            indicator=[SimpleNamespace(label="GCaMP6f")] * 2,
+            excitation_wavelength_in_nm=[470.0, 470.0],
+            emission_wavelength_in_nm=[525.0, 525.0],
+        )
+        series = _mock_two_fiber_series(region)
+        nwbfile = MagicMock()
+        nwbfile.objects.values.return_value = [series]
+
+        with patch(
+            "fiber_mosaic.extractors.dandi_extractor._check_dandi_dependencies"
+        ):
+            with patch(
+                "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
+                return_value=(nwbfile, MagicMock()),
+            ):
+                rec = DandiFiberPhotometryExtractor(
+                    "dandi://000123/sub-1/file.nwb",
+                    series_name="FPSeries",
+                    name="green",
+                )
+
+        assert list(rec.get_property("fiber_location")) == ["DMS", "NAc"]
+        assert list(rec.get_property("emission_nm")) == [525.0, 525.0]
 
 
 class TestDANDIMock:
@@ -1688,10 +1807,10 @@ class TestDandiExtractorFullCoverage:
                 rec = DandiFiberPhotometryExtractor(
                     "dandi://000123/sub-1/file.nwb",
                     series_name="GCaMP",
-                    color="green",
+                    name="green",
                 )
                 assert rec.get_num_fibers() == 2
-                assert rec.color == "green"
+                assert rec.name == "green"
                 # Data not loaded during init — __getitem__ never called
                 mock_series.data.__getitem__.assert_not_called()
 
@@ -1724,7 +1843,7 @@ class TestDandiExtractorFullCoverage:
                 return_value=(mock_nwbfile, mock_io),
             ):
                 rec = DandiFiberPhotometryExtractor(
-                    "dandi://000123/sub-1/file.nwb", color="green"
+                    "dandi://000123/sub-1/file.nwb", name="green"
                 )
                 assert rec.get_num_fibers() == 1
 
@@ -1865,7 +1984,7 @@ class TestDandiExtractorFullCoverage:
                 rec = read_dandi_fiber_photometry(
                     "dandi://000123/sub-1/file.nwb",
                     series_name="GCaMP",
-                    color="green",
+                    name="green",
                 )
                 assert rec.get_num_fibers() == 1
 
@@ -1944,7 +2063,7 @@ class TestDandiExtractorFullCoverage:
                 rec = DandiFiberPhotometryExtractor(
                     "dandi://000123/sub-1/file.nwb",
                     series_name="GCaMP",
-                    color="green",
+                    name="green",
                 )
                 # _stream_nwb called once (metadata); no data loaded yet
                 assert mock_stream.call_count == 1
@@ -2373,7 +2492,7 @@ class TestDoricExtractorFullCoverage:
                         rec = DoricFiberPhotometryExtractor(
                             str(doric_path),
                             stream_name="Signal",
-                            color="green",
+                            name="green",
                         )
                         assert rec.get_num_samples() == 3
 
@@ -2443,7 +2562,7 @@ class TestNpmExtractorFullCoverage:
             rec = NpmFiberPhotometryExtractor(
                 csv_path,
                 stream_name="Region0G_led1",
-                color="green",
+                name="green",
                 timestamp_column="SystemTimestamp",
             )
             assert rec.get_num_samples() == 2
@@ -2462,7 +2581,7 @@ class TestNpmExtractorFullCoverage:
 
             with pytest.raises(ValueError, match="Multiple timestamp columns"):
                 NpmFiberPhotometryExtractor(
-                    csv_path, stream_name="Region0G_led1", color="green"
+                    csv_path, stream_name="Region0G_led1", name="green"
                 )
 
 
@@ -2508,10 +2627,10 @@ class TestNwbExtractorFullCoverage:
                     return_value=mock_io,
                 ):
                     rec = NwbFiberPhotometryExtractor(
-                        str(nwb_path), series_name="FPSeries", color="green"
+                        str(nwb_path), series_name="FPSeries", name="green"
                     )
                     assert rec.get_num_fibers() == 2
-                    assert rec.color == "green"
+                    assert rec.name == "green"
 
     def test_nwb_extractor_no_series(self):
         """Test error when no FiberPhotometryResponseSeries found."""
@@ -2673,7 +2792,7 @@ class TestNwbExtractorFullCoverage:
                     return_value=mock_io,
                 ):
                     rec = read_nwb_fiber_photometry(
-                        str(nwb_path), color="green"
+                        str(nwb_path), name="green"
                     )
                     assert rec.get_num_fibers() == 1
 
@@ -2686,7 +2805,7 @@ class TestNwbExtractorFullCoverage:
                 NwbFiberPhotometryExtractor("/nonexistent/path/session.nwb")
 
     def test_nwb_extractor_no_color(self):
-        """Test error when color is not provided."""
+        """Test error when name is not provided."""
         from fiber_mosaic.extractors import NwbFiberPhotometryExtractor
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2719,7 +2838,7 @@ class TestNwbExtractorFullCoverage:
                     return_value=mock_io,
                 ):
                     with pytest.raises(
-                        ValueError, match="color must be provided"
+                        ValueError, match="name must be provided"
                     ):
                         NwbFiberPhotometryExtractor(
                             str(nwb_path), series_name="FPSeries"
@@ -2759,7 +2878,7 @@ class TestNwbExtractorFullCoverage:
                     return_value=mock_io,
                 ):
                     rec = NwbFiberPhotometryExtractor(
-                        str(nwb_path), series_name="FPSeries", color="green"
+                        str(nwb_path), series_name="FPSeries", name="green"
                     )
                     assert rec.get_sampling_frequency() == 20.0
 
@@ -2797,12 +2916,12 @@ class TestNwbExtractorFullCoverage:
                     return_value=mock_io,
                 ):
                     rec = NwbFiberPhotometryExtractor(
-                        str(nwb_path), series_name="FPSeries", color="green"
+                        str(nwb_path), series_name="FPSeries", name="green"
                     )
                     assert rec.get_sampling_frequency() == 1.0
 
     def test_dandi_no_color_raises(self):
-        """Test error when color is not provided."""
+        """Test error when name is not provided."""
         from fiber_mosaic.extractors import DandiFiberPhotometryExtractor
 
         mock_data = np.random.randn(100)
@@ -2831,7 +2950,7 @@ class TestNwbExtractorFullCoverage:
                 "fiber_mosaic.extractors.dandi_extractor._stream_nwb",
                 return_value=(mock_nwbfile, mock_io),
             ):
-                with pytest.raises(ValueError, match="color must be provided"):
+                with pytest.raises(ValueError, match="name must be provided"):
                     DandiFiberPhotometryExtractor(
                         "dandi://000123/sub-1/file.nwb"
                     )
@@ -3191,10 +3310,10 @@ class TestTdtExtractorFullCoverage:
             data.tofile(str(tev_path))
 
             rec = TdtFiberPhotometryExtractor(
-                tmpdir, store_name="Dv1A", color="green"
+                tmpdir, store_name="Dv1A", name="green"
             )
             assert rec.get_num_samples() == 80
-            assert rec.color == "green"
+            assert rec.name == "green"
 
     def test_tdt_get_streams(self):
         """Test TdtFiberPhotometryExtractor.get_streams."""
@@ -3280,7 +3399,7 @@ class TestTdtExtractorFullCoverage:
             data.tofile(str(tev_path))
 
             rec = read_tdt_fiber_photometry(
-                tmpdir, store_name="Dv1A", color="green"
+                tmpdir, store_name="Dv1A", name="green"
             )
             assert rec.get_num_samples() == 40
 
@@ -3386,7 +3505,7 @@ class TestDoricRealFiles:
 
             # Pass the folder so _resolve_doric_path locates the .doric file.
             rec = DoricFiberPhotometryExtractor(
-                tmpdir, stream_name="AnalogIn/AIn-1", color="green"
+                tmpdir, stream_name="AnalogIn/AIn-1", name="green"
             )
             assert rec.get_num_samples() == 10
 
@@ -3474,7 +3593,7 @@ class TestNpmBranchCoverage:
             csv_path.write_text(
                 "Timestamp,LedState,Region0G\n0,1,100.0\n1000,1,101.0\n"
             )
-            rec = NpmFiberPhotometryExtractor(str(csv_path), color="green")
+            rec = NpmFiberPhotometryExtractor(str(csv_path), name="green")
             assert rec.get_num_samples() == 2
 
 
@@ -3528,11 +3647,11 @@ class TestTdtBranchCoverage:
 
             np.arange(40, dtype=np.float32).tofile(str(tev_path))
 
-            rec = TdtFiberPhotometryExtractor(tmpdir, color="green")
+            rec = TdtFiberPhotometryExtractor(tmpdir, name="green")
             assert rec.get_num_samples() == 40
 
     def test_tdt_no_color_raises(self):
-        """Test error when color is not provided."""
+        """Test error when name is not provided."""
         from fiber_mosaic.extractors import TdtFiberPhotometryExtractor
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3573,7 +3692,7 @@ class TestTdtBranchCoverage:
             record.tofile(str(tsq_path))
             np.arange(40, dtype=np.float32).tofile(str(tev_path))
 
-            with pytest.raises(ValueError, match="color must be provided"):
+            with pytest.raises(ValueError, match="name must be provided"):
                 TdtFiberPhotometryExtractor(tmpdir, store_name="Dv1A")
 
 
@@ -3600,10 +3719,10 @@ class TestDoricGuPPySampleSessions:
 
         session_dir = RESOURCES_DIR / "doric" / "sample_doric_1"
         rec = DoricFiberPhotometryExtractor(
-            session_dir, stream_name="AIn-1 - Raw", color="green"
+            session_dir, stream_name="AIn-1 - Raw", name="green"
         )
         assert rec.get_num_samples() > 0
-        assert rec.color == "green"
+        assert rec.name == "green"
 
     def test_sample_doric_1_get_streams(self):
         """Stream discovery lists the V1 console channels."""
@@ -3630,10 +3749,10 @@ class TestDoricGuPPySampleSessions:
 
         session_dir = RESOURCES_DIR / "doric" / "sample_doric_3"
         rec1 = DoricFiberPhotometryExtractor(
-            session_dir, stream_name="CAM1_EXC1/ROI01", color="470nm"
+            session_dir, stream_name="CAM1_EXC1/ROI01", name="470nm"
         )
         rec2 = DoricFiberPhotometryExtractor(
-            session_dir, stream_name="CAM1_EXC1/ROI02", color="415nm"
+            session_dir, stream_name="CAM1_EXC1/ROI02", name="415nm"
         )
         assert rec1.get_num_samples() > 0
         assert rec1.get_num_samples() == rec2.get_num_samples()
@@ -3647,7 +3766,7 @@ class TestDoricGuPPySampleSessions:
 
         session_dir = RESOURCES_DIR / "doric" / "sample_doric_3"
         rec = DoricFiberPhotometryExtractor(
-            session_dir, stream_name="DigitalIO/CAM1", color="ttl"
+            session_dir, stream_name="DigitalIO/CAM1", name="ttl"
         )
         assert rec.get_num_samples() > 0
 
@@ -3661,7 +3780,7 @@ class TestDoricGuPPySampleSessions:
         rec = DoricFiberPhotometryExtractor(
             session_dir,
             stream_name="Series0001/AIN01xAOUT01-LockIn",
-            color="green",
+            name="green",
         )
         assert rec.get_num_samples() > 0
 
@@ -3673,7 +3792,7 @@ class TestDoricGuPPySampleSessions:
         rec = DoricFiberPhotometryExtractor(
             session_dir,
             stream_name="Series0001/AIN01xAOUT01-LockIn",
-            color="green",
+            name="green",
         )
         assert rec.get_num_samples() > 0
 
@@ -3684,7 +3803,7 @@ class TestDoricGuPPySampleSessions:
 
         session_dir = RESOURCES_DIR / "doric" / "sample_doric_2"
         rec = DoricFiberPhotometryExtractor(
-            session_dir, stream_name="AIn-1 - Dem (da)", color="470nm"
+            session_dir, stream_name="AIn-1 - Dem (da)", name="470nm"
         )
         assert rec.get_num_samples() > 0
 
