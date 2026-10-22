@@ -15,14 +15,11 @@ traces.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 import numpy as np
-from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 from fiber_mosaic.core.base import (
-    BaseFiberPhotometryExtractor,
     FiberPhotometryRecordingGroup,
+    recording_from_traces,
 )
 
 #: Default acquisition rate in Hz, typical for fiber photometry.
@@ -187,64 +184,16 @@ def simulate_bands(
     return signal, reference, calcium
 
 
-def recording_from_traces(
-    traces: np.ndarray | Sequence[np.ndarray],
-    color: str,
-    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
-    fiber_ids: Sequence | None = None,
-) -> BaseFiberPhotometryExtractor:
-    """Wrap traces arrays as a fiber photometry recording.
-
-    Parameters
-    ----------
-    traces : np.ndarray or sequence of np.ndarray
-        One ``(num_samples, num_fibers)`` array for a single segment, or one
-        array per segment.
-    color : str
-        Band label, e.g. ``"green"`` or ``"iso"``.
-    sampling_frequency : float, default: DEFAULT_SAMPLING_FREQUENCY
-        Acquisition rate in Hz.
-    fiber_ids : sequence or None, default: None
-        Fiber IDs; defaults to ``"fiber_0" ... "fiber_n"``.
-
-    Returns
-    -------
-    BaseFiberPhotometryExtractor
-        A recording with one segment per array in ``traces``.
-    """
-    if isinstance(traces, np.ndarray):
-        segments = [traces]
-    else:
-        segments = [np.asarray(segment) for segment in traces]
-    if fiber_ids is None:
-        fiber_ids = [f"fiber_{index}" for index in range(segments[0].shape[1])]
-
-    recording = BaseFiberPhotometryExtractor(
-        sampling_frequency=sampling_frequency,
-        fiber_ids=fiber_ids,
-        color=color,
-        dtype=segments[0].dtype,
-    )
-    for segment_traces in segments:
-        recording.add_segment(
-            NumpyRecordingSegment(
-                traces=segment_traces,
-                sampling_frequency=sampling_frequency,
-                t_start=None,
-            )
-        )
-    return recording
-
-
 def simulate_group(
     signal_color: str = "green",
     reference_color: str = "iso",
+    sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
     **kwargs,
 ) -> tuple[FiberPhotometryRecordingGroup, np.ndarray]:
     """Simulate a two-band group plus the ground-truth calcium.
 
     Convenience wrapper around :func:`simulate_bands` and
-    :func:`recording_from_traces`.
+    :func:`~fiber_mosaic.core.base.recording_from_traces`.
 
     Parameters
     ----------
@@ -252,9 +201,12 @@ def simulate_group(
         Band name for the calcium-dependent recording.
     reference_color : str, default: "iso"
         Band name for the isosbestic reference recording.
+    sampling_frequency : float, default: DEFAULT_SAMPLING_FREQUENCY
+        Acquisition rate in Hz. Passed to both `simulate_bands` and
+        `recording_from_traces`, so the two never disagree.
     **kwargs
         Forwarded to :func:`simulate_bands` (``num_samples``, ``num_fibers``,
-        ``sampling_frequency``, ``baseline``, ``seed``).
+        ``baseline``, ``seed``).
 
     Returns
     -------
@@ -263,10 +215,9 @@ def simulate_group(
     calcium : np.ndarray
         Ground-truth calcium component of the signal band.
     """
-    sampling_frequency = kwargs.get(
-        "sampling_frequency", DEFAULT_SAMPLING_FREQUENCY
+    signal, reference, calcium = simulate_bands(
+        sampling_frequency=sampling_frequency, **kwargs
     )
-    signal, reference, calcium = simulate_bands(**kwargs)
     group = FiberPhotometryRecordingGroup(
         {
             signal_color: recording_from_traces(
@@ -284,7 +235,6 @@ __all__ = [
     "DEFAULT_BASELINE",
     "DEFAULT_SAMPLING_FREQUENCY",
     "calcium_transients",
-    "recording_from_traces",
     "simulate_bands",
     "simulate_group",
     "smooth_drift",
