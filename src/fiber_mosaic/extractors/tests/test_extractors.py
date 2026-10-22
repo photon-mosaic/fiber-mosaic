@@ -49,9 +49,9 @@ class TestCsvExtractor:
             assert traces.shape == (100, 2)
 
             # Verify timestamps
-            times = rec.get_fiber_times()
-            assert times.shape == (100, 2)
-            assert np.allclose(times[0, 0], 0.0)
+            times = rec.get_times()
+            assert len(times) == 100
+            assert np.allclose(times[0], 0.0)
         finally:
             Path(csv_path).unlink()
 
@@ -344,176 +344,6 @@ class TestCsvExtractor:
 
 class TestBaseFiberPhotometryExtractor:
     """Tests for base extractor functionality."""
-
-    def test_per_fiber_times(self):
-        """Test per-fiber timestamp handling."""
-        from spikeinterface.core.numpyextractors import NumpyRecordingSegment
-
-        from fiber_mosaic import BaseFiberPhotometryExtractor
-
-        # Create simple recording
-        n_samples = 100
-        n_fibers = 3
-        sampling_rate = 100.0
-
-        traces = np.random.randn(n_samples, n_fibers)
-
-        class TestExtractor(BaseFiberPhotometryExtractor):
-            pass
-
-        rec = TestExtractor(
-            sampling_frequency=sampling_rate,
-            fiber_ids=["f1", "f2", "f3"],
-            color="green",
-        )
-        segment = NumpyRecordingSegment(traces, sampling_rate, t_start=0.0)
-        rec.add_segment(segment)
-
-        # Test 1D times (broadcast to all fibers)
-        times_1d = np.arange(n_samples) / sampling_rate
-        rec.set_times(times_1d)
-        assert rec.has_fiber_times()
-
-        retrieved = rec.get_fiber_times()
-        assert retrieved.shape == (n_samples, n_fibers)
-        np.testing.assert_allclose(retrieved[:, 0], times_1d)
-
-        # Test 2D times (per-fiber)
-        times_2d = np.column_stack(
-            [
-                times_1d,
-                times_1d + 0.001,  # Slightly offset
-                times_1d + 0.002,
-            ]
-        )
-        rec.set_times(times_2d)
-
-        retrieved = rec.get_fiber_times()
-        np.testing.assert_allclose(retrieved, times_2d)
-
-    def test_set_times_invalid_1d_length(self):
-        """Test error with wrong length 1D times."""
-        from spikeinterface.core.numpyextractors import NumpyRecordingSegment
-
-        from fiber_mosaic import BaseFiberPhotometryExtractor
-
-        class TestExtractor(BaseFiberPhotometryExtractor):
-            pass
-
-        rec = TestExtractor(
-            sampling_frequency=100.0,
-            fiber_ids=["f1", "f2"],
-            color="green",
-        )
-        segment = NumpyRecordingSegment(np.zeros((100, 2)), 100.0, t_start=0.0)
-        rec.add_segment(segment)
-
-        with pytest.raises(ValueError, match="1D times array length"):
-            rec.set_times(np.arange(50))  # Wrong length
-
-    def test_set_times_invalid_2d_shape(self):
-        """Test error with wrong shape 2D times."""
-        from spikeinterface.core.numpyextractors import NumpyRecordingSegment
-
-        from fiber_mosaic import BaseFiberPhotometryExtractor
-
-        class TestExtractor(BaseFiberPhotometryExtractor):
-            pass
-
-        rec = TestExtractor(
-            sampling_frequency=100.0,
-            fiber_ids=["f1", "f2"],
-            color="green",
-        )
-        segment = NumpyRecordingSegment(np.zeros((100, 2)), 100.0, t_start=0.0)
-        rec.add_segment(segment)
-
-        with pytest.raises(ValueError, match="2D times array shape"):
-            rec.set_times(np.zeros((100, 3)))  # Wrong shape
-
-    def test_set_times_invalid_ndim(self):
-        """Test error with 3D times array."""
-        from spikeinterface.core.numpyextractors import NumpyRecordingSegment
-
-        from fiber_mosaic import BaseFiberPhotometryExtractor
-
-        class TestExtractor(BaseFiberPhotometryExtractor):
-            pass
-
-        rec = TestExtractor(
-            sampling_frequency=100.0,
-            fiber_ids=["f1", "f2"],
-            color="green",
-        )
-        segment = NumpyRecordingSegment(np.zeros((100, 2)), 100.0, t_start=0.0)
-        rec.add_segment(segment)
-
-        with pytest.raises(ValueError, match="must be 1D or 2D"):
-            rec.set_times(np.zeros((100, 2, 1)))  # 3D array
-
-    def test_get_fiber_times_no_times_set(self):
-        """Test get_fiber_times falls back to nominal timestamps."""
-        from spikeinterface.core.numpyextractors import NumpyRecordingSegment
-
-        from fiber_mosaic import BaseFiberPhotometryExtractor
-
-        class TestExtractor(BaseFiberPhotometryExtractor):
-            pass
-
-        rec = TestExtractor(
-            sampling_frequency=100.0,
-            fiber_ids=["f1", "f2"],
-            color="green",
-        )
-        segment = NumpyRecordingSegment(np.zeros((100, 2)), 100.0, t_start=0.0)
-        rec.add_segment(segment)
-
-        # Don't set times - should fall back to nominal
-        assert not rec.has_fiber_times()
-        times = rec.get_fiber_times()
-        assert times.shape == (100, 2)
-
-    def test_get_fiber_times_with_fiber_ids(self):
-        """Test get_fiber_times with specific fiber IDs."""
-        from spikeinterface.core.numpyextractors import NumpyRecordingSegment
-
-        from fiber_mosaic import BaseFiberPhotometryExtractor
-
-        class TestExtractor(BaseFiberPhotometryExtractor):
-            pass
-
-        rec = TestExtractor(
-            sampling_frequency=100.0,
-            fiber_ids=["f1", "f2", "f3"],
-            color="green",
-        )
-        segment = NumpyRecordingSegment(np.zeros((100, 3)), 100.0, t_start=0.0)
-        rec.add_segment(segment)
-
-        # Get times for specific fibers
-        times = rec.get_fiber_times(fiber_ids=["f1", "f2"])
-        assert times.shape == (100, 2)
-
-    def test_get_fiber_times_with_range(self):
-        """Test get_fiber_times with frame range."""
-        from spikeinterface.core.numpyextractors import NumpyRecordingSegment
-
-        from fiber_mosaic import BaseFiberPhotometryExtractor
-
-        class TestExtractor(BaseFiberPhotometryExtractor):
-            pass
-
-        rec = TestExtractor(
-            sampling_frequency=100.0,
-            fiber_ids=["f1", "f2"],
-            color="green",
-        )
-        segment = NumpyRecordingSegment(np.zeros((100, 2)), 100.0, t_start=0.0)
-        rec.add_segment(segment)
-        rec.set_times(np.arange(100) / 100.0)
-
-        times = rec.get_fiber_times(start_frame=10, end_frame=20)
-        assert times.shape == (10, 2)
 
     def test_get_streams_not_implemented(self):
         """Test get_streams raises NotImplementedError on base class."""
@@ -1108,9 +938,9 @@ class TestNpmExtractor:
             rec = NpmFiberPhotometryExtractor(
                 csv_path, stream_name="Region0G_led1", color="green"
             )
-            times = rec.get_fiber_times()
+            times = rec.get_times()
             # Converted to seconds: 0, 0.025, 0.05, 0.075
-            np.testing.assert_allclose(times[:, 0], [0.0, 0.025, 0.05, 0.075])
+            np.testing.assert_allclose(times, [0.0, 0.025, 0.05, 0.075])
 
     def test_npm_timestamp_seconds_not_converted(self):
         """Test NPM timestamps already in seconds are not converted."""
@@ -1130,8 +960,8 @@ class TestNpmExtractor:
             rec = NpmFiberPhotometryExtractor(
                 csv_path, stream_name="Region0G_led1", color="green"
             )
-            times = rec.get_fiber_times()
-            np.testing.assert_allclose(times[:, 0], [0.0, 0.025, 0.05, 0.075])
+            times = rec.get_times()
+            np.testing.assert_allclose(times, [0.0, 0.025, 0.05, 0.075])
 
     def test_npm_timestamp_unit_ms_explicit(self):
         """timestamp_unit='ms' forces conversion regardless of interval."""
@@ -1155,9 +985,9 @@ class TestNpmExtractor:
                 color="green",
                 timestamp_unit="ms",
             )
-            times = rec.get_fiber_times()
+            times = rec.get_times()
             np.testing.assert_allclose(
-                times[:, 0], [0.0, 0.000025, 0.00005, 0.000075]
+                times, [0.0, 0.000025, 0.00005, 0.000075]
             )
 
     def test_npm_timestamp_unit_s_explicit(self):
@@ -1182,8 +1012,8 @@ class TestNpmExtractor:
                 color="green",
                 timestamp_unit="s",
             )
-            times = rec.get_fiber_times()
-            np.testing.assert_allclose(times[:, 0], [0.0, 25.0, 50.0, 75.0])
+            times = rec.get_times()
+            np.testing.assert_allclose(times, [0.0, 25.0, 50.0, 75.0])
 
     def test_npm_timestamp_unit_invalid(self):
         """timestamp_unit rejects values other than 's', 'ms', or None."""
@@ -1293,7 +1123,7 @@ class TestNpmHeaderlessFiles:
             traces = rec.get_fluorescence().ravel()
             assert traces[0] == pytest.approx(6558.5)
             # Millisecond timebase is converted to seconds.
-            times = rec.get_fiber_times().ravel()
+            times = rec.get_times()
             assert times[0] == pytest.approx(1.0)
             assert rec.get_sampling_frequency() == pytest.approx(40.0)
 
@@ -1312,7 +1142,7 @@ class TestNpmHeaderlessFiles:
                 csv_path, stream_name="Region0G_led0", color="green"
             )
             # Falls back to frame-index timestamps.
-            assert rec.get_fiber_times().ravel().tolist() == [0.0, 1.0, 2.0]
+            assert rec.get_times().tolist() == [0.0, 1.0, 2.0]
 
     def test_headerless_single_column(self):
         """A one-column file has no timebase to detect."""

@@ -384,7 +384,7 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
             t_start=t_start,
         )
         self.add_segment(segment)
-        self.set_times(timestamps)
+        self.set_times(timestamps, with_warning=False)
 
         self._kwargs = {
             "dandi_uri": dandi_uri,
