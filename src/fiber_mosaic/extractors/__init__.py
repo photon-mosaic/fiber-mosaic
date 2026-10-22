@@ -24,7 +24,7 @@ Usage:
     formats = detect_formats("/path/to/data")
 
     # Read a specific format
-    recording = read_csv_fiber_photometry("data.csv", color="green")
+    recording = read_csv_fiber_photometry("data.csv", name="green")
 """
 
 from .csv_extractor import (

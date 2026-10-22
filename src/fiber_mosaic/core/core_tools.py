@@ -26,11 +26,11 @@ def define_function_handling_group_from_class(
 
     The returned function dispatches on its first argument and returns the
     matching container, so a step reads the same whether it is applied to one
-    color or to a whole session:
+    recording or to a whole session:
 
     - a recording -> a preprocessed recording
     - a ``dict`` of recordings -> a dict of preprocessed recordings
-    - a ``FiberPhotometryRecordingGroup`` -> a new group, colors preserved
+    - a ``FiberPhotometryRecordingGroup`` -> a new group, names preserved
 
     Parameters
     ----------
@@ -51,11 +51,11 @@ def define_function_handling_group_from_class(
 
     Notes
     -----
-    Dispatch broadcasts the step over each color independently, so this is
-    only meaningful for steps with a *single* recording input. A step that
-    consumes a second band -- an isosbestic reference, say -- combines colors
-    rather than mapping over them, and must take them explicitly instead of
-    being broadcast.
+    Dispatch broadcasts the step over each recording independently, so
+    this is only meaningful for steps with a *single* recording input. A
+    step that consumes a second band -- an isosbestic reference, say --
+    combines recordings rather than mapping over them, and must take them
+    explicitly instead of being broadcast.
 
     Unlike SpikeInterface's dict-only version, the input is located with an
     ``in`` test rather than a truthiness test, so an empty dict dispatches as
@@ -87,8 +87,8 @@ def define_function_handling_group_from_class(
         if isinstance(target, FiberPhotometryRecordingGroup):
             return FiberPhotometryRecordingGroup(
                 {
-                    color: source_class(recording, *rest_args, **rest_kwargs)
-                    for color, recording in target.items()
+                    name: source_class(recording, *rest_args, **rest_kwargs)
+                    for name, recording in target.items()
                 }
             )
         if isinstance(target, dict):

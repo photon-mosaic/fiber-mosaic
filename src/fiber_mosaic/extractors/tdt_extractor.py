@@ -179,8 +179,8 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     store_name : str, optional
         Name of the store to read. If None and only one photometry store
         exists, it will be used automatically.
-    color : str
-        Color/wavelength identifier (e.g. ``"green"``, ``"415nm"``).
+    name : str
+        Free-text label for this recording (e.g. ``"green"``, ``"415nm"``).
         Must be provided explicitly; TDT store names encode signal type,
         not illumination color.
 
@@ -193,7 +193,7 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     >>> recording = TdtFiberPhotometryExtractor(
     ...     "/path/to/tdt",
     ...     store_name="Dv1A",
-    ...     color="green"
+    ...     name="green"
     ... )
     """
 
@@ -201,7 +201,7 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         self,
         folder_path: str | Path,
         store_name: str | None = None,
-        color: str | None = None,
+        name: str | None = None,
     ):
         folder_path = Path(folder_path)
 
@@ -267,9 +267,9 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         # Create fiber IDs
         fiber_ids = [store_name]
 
-        if color is None:
+        if name is None:
             raise ValueError(
-                "color must be provided explicitly (e.g. color='green'). "
+                "name must be provided explicitly (e.g. name='green'). "
                 "TDT store names encode signal type "
                 "(e.g. 'x65A'), not illumination color."
             )
@@ -278,7 +278,7 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         super().__init__(
             sampling_frequency=sampling_rate,
             fiber_ids=fiber_ids,
-            color=color,
+            name=name,
             dtype=data.dtype,
         )
 
@@ -288,7 +288,7 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         self._kwargs = {
             "folder_path": str(folder_path),
             "store_name": store_name,
-            "color": color,
+            "name": name,
         }
 
         logger.info(
@@ -327,7 +327,7 @@ class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 def read_tdt_fiber_photometry(
     folder_path: str | Path,
     store_name: str | None = None,
-    color: str | None = None,
+    name: str | None = None,
 ) -> TdtFiberPhotometryExtractor:
     """
     Read fiber photometry data from TDT files.
@@ -340,8 +340,8 @@ def read_tdt_fiber_photometry(
         Path to folder containing TDT files.
     store_name : str, optional
         Name of the store to read.
-    color : str
-        Color/wavelength identifier.
+    name : str
+        Free-text label for this recording.
 
     Returns
     -------
@@ -351,5 +351,5 @@ def read_tdt_fiber_photometry(
     return TdtFiberPhotometryExtractor(
         folder_path=folder_path,
         store_name=store_name,
-        color=color,
+        name=name,
     )
