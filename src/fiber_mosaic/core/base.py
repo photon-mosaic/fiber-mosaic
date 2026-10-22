@@ -138,7 +138,26 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
         "iso"), stored as SpikeInterface's ``name``.
     dtype : dtype, optional
         The data type of the traces. Default is float64.
+
+    Notes
+    -----
+    Metadata for the NWB fiber table is set with SpikeInterface's own
+    methods, under these names:
+
+    - per fiber, the property ``fiber_location``: one brain-area string per
+      fiber, ``rec.set_property("fiber_location", ["DMS", "NAc"])``. The
+      name ``location`` is reserved by SpikeInterface for probe coordinates.
+    - per recording, the annotations ``excitation_nm`` and ``emission_nm``
+      (wavelengths in nanometres) and ``indicator`` (e.g. ``"GCaMP6f"``),
+      ``rec.annotate(excitation_nm=470, emission_nm=525,
+      indicator="GCaMP6f")``.
+
+    All of them survive SpikeInterface processing steps and the
+    ``dump_to_json`` round trip.
     """
+
+    # SpikeInterface's default ``dump_to_json`` keeps only these properties.
+    _main_properties = [*BaseRecording._main_properties, "fiber_location"]
 
     def __init__(
         self,

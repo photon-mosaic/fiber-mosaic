@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import spikeinterface as si
 from spikeinterface.core import BaseRecording
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
@@ -12,6 +13,7 @@ from fiber_mosaic.core.base import (
     FiberPhotometryMixin,
     FiberPhotometryRecordingGroup,
 )
+from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
 
 
 def _make_recording(
@@ -199,6 +201,28 @@ def test_mixin_provides_fiber_api_off_a_plain_recording():
     np.testing.assert_array_equal(rec.get_fiber_ids(), rec.fiber_ids)
     np.testing.assert_array_equal(rec.get_fluorescence(), traces)
     assert "name=green" in repr(rec)
+
+
+def test_fiber_location_survives_json_round_trip(tmp_path):
+    """``fiber_location`` is kept by the default ``dump_to_json``."""
+    times = np.arange(10) / 10.0
+    csv_path = tmp_path / "rec.csv"
+    np.savetxt(
+        csv_path,
+        np.column_stack([times, times, times]),
+        delimiter=",",
+        header="time,fiber_a,fiber_b",
+        comments="",
+    )
+    rec = CsvFiberPhotometryExtractor(
+        csv_path, name="green", time_column="time"
+    )
+    rec.set_property("fiber_location", ["DMS", "NAc"])
+
+    rec.dump_to_json(tmp_path / "rec.json")
+    loaded = si.load(tmp_path / "rec.json")
+
+    assert list(loaded.get_property("fiber_location")) == ["DMS", "NAc"]
 
 
 def test_name_survives_copy_metadata(recording):
