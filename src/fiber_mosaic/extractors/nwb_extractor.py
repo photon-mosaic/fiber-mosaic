@@ -115,6 +115,43 @@ def _resolve_nwb_series(
     return series_name
 
 
+# per-fiber property <- FiberPhotometryTable column (ndx-fiber-photometry v0.2)
+_FIBER_TABLE_COLUMNS = {
+    "fiber_location": "location",
+    "indicator": "indicator",
+    "excitation_nm": "excitation_wavelength_in_nm",
+    "emission_nm": "emission_wavelength_in_nm",
+}
+
+
+def _fiber_table_properties(series) -> dict[str, list]:
+    """Read per-fiber metadata from the fiber-table rows of ``series``.
+
+    The series' ``fiber_photometry_table_region`` names one table row per
+    data column, in column order. Returns plain values, so the result stays
+    valid after the file is closed. Columns the table lacks are skipped; a
+    series without a region gives an empty dict.
+
+    Returns
+    -------
+    dict
+        Property name to one value per fiber, for ``set_property``.
+    """
+    region = getattr(series, "fiber_photometry_table_region", None)
+    if region is None:
+        return {}
+    rows = list(region.data[:])
+    table = region.table
+    properties = {}
+    for key, column in _FIBER_TABLE_COLUMNS.items():
+        if column in table.colnames:
+            values = [table[column][row] for row in rows]
+            if column == "indicator":
+                values = [indicator.label for indicator in values]
+            properties[key] = values
+    return properties
+
+
 class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     """
     Extractor for NWB fiber photometry files.
@@ -172,6 +209,7 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 
             series_name = _resolve_nwb_series(series_dict, series_name)
             series = series_dict[series_name]
+            properties = _fiber_table_properties(series)
 
             # Read data
             data = np.array(series.data[:])
@@ -219,6 +257,8 @@ class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
 
         self._add_numpy_segment(data, timestamps)
+        for key, values in properties.items():
+            self.set_property(key, values)
 
         # Store kwargs for serialization
         self._kwargs = {

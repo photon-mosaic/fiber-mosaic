@@ -4,6 +4,7 @@ Tests for fiber-mosaic extractors.
 
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -1585,6 +1586,93 @@ class TestNWBMock:
                             series_name="FPSeries",
                             name="green",
                         )
+
+
+class _FakeFiberTable(dict):
+    """Fiber table stand-in: ``table[column][row]`` and ``colnames``."""
+
+    @property
+    def colnames(self):
+        return tuple(self)
+
+
+def _fiber_table_region(**columns):
+    """Region pointing at rows 0 and 1 of a fake fiber table."""
+    return SimpleNamespace(data=[0, 1], table=_FakeFiberTable(columns))
+
+
+def _mock_two_fiber_series(region):
+    """Readable mock series with two fibers and the given table region."""
+    series = MagicMock()
+    series.name = "FPSeries"
+    series.neurodata_type = "FiberPhotometryResponseSeries"
+    series.data.__getitem__ = lambda self, x: np.zeros((10, 2))
+    series.data.shape = (10, 2)
+    series.get_timestamps.return_value = np.arange(10) / 10.0
+    series.rate = 10.0
+    series.fiber_photometry_table_region = region
+    return series
+
+
+def _read_nwb(series, tmp_path):
+    """Read ``series`` through ``NwbFiberPhotometryExtractor``, mocked."""
+    from fiber_mosaic.extractors import NwbFiberPhotometryExtractor
+
+    nwb_path = tmp_path / "session.nwb"
+    nwb_path.touch()
+    nwbfile = MagicMock()
+    nwbfile.objects.values.return_value = [series]
+    io = MagicMock()
+    io.read.return_value = nwbfile
+    io.__enter__ = MagicMock(return_value=io)
+    io.__exit__ = MagicMock(return_value=False)
+    with patch("fiber_mosaic.extractors.nwb_extractor._check_pynwb"):
+        with patch(
+            "fiber_mosaic.extractors.nwb_extractor.NWBHDF5IO",
+            return_value=io,
+        ):
+            return NwbFiberPhotometryExtractor(
+                str(nwb_path), series_name="FPSeries", name="green"
+            )
+
+
+class TestNwbFiberTableProperties:
+    """The NWB reader fills per-fiber properties from the fiber table."""
+
+    def test_all_columns_fill_all_properties(self, tmp_path):
+        region = _fiber_table_region(
+            location=["DMS", "NAc"],
+            indicator=[
+                SimpleNamespace(label="GCaMP6f"),
+                SimpleNamespace(label="dLight1.3b"),
+            ],
+            excitation_wavelength_in_nm=[470.0, 470.0],
+            emission_wavelength_in_nm=[525.0, 525.0],
+        )
+
+        rec = _read_nwb(_mock_two_fiber_series(region), tmp_path)
+
+        assert list(rec.get_property("fiber_location")) == ["DMS", "NAc"]
+        assert list(rec.get_property("indicator")) == ["GCaMP6f", "dLight1.3b"]
+        assert list(rec.get_property("excitation_nm")) == [470.0, 470.0]
+        assert list(rec.get_property("emission_nm")) == [525.0, 525.0]
+
+    def test_missing_columns_leave_properties_unset(self, tmp_path):
+        region = _fiber_table_region(
+            location=["VTA", "VTA"],
+            indicator=[SimpleNamespace(label="GCaMP6f")] * 2,
+        )
+
+        rec = _read_nwb(_mock_two_fiber_series(region), tmp_path)
+
+        assert list(rec.get_property("fiber_location")) == ["VTA", "VTA"]
+        assert list(rec.get_property("indicator")) == ["GCaMP6f", "GCaMP6f"]
+        assert rec.get_property("excitation_nm") is None
+
+    def test_series_without_region_sets_nothing(self, tmp_path):
+        rec = _read_nwb(_mock_two_fiber_series(None), tmp_path)
+
+        assert rec.get_property("fiber_location") is None
 
 
 class TestDANDIMock:
