@@ -260,9 +260,27 @@ def test_dict_overlays_stages_on_one_axis() -> None:
     assert isinstance(widget, FiberTracesWidget)
     assert len(widget.ax.get_lines()) == 2 * 3
     assert _legend_texts(widget.ax) == ["raw", "zscore"]
-    raw_color = widget.ax.get_lines()[0].get_color()
-    zscore_color = widget.ax.get_lines()[3].get_color()
-    assert raw_color != zscore_color
+    colors = [line.get_color() for line in widget.ax.get_lines()]
+    assert colors == ["C0"] * 3 + ["C1"] * 3
+
+
+def test_dict_ignores_trace_color() -> None:
+    """One color for every layer would hide which layer is which."""
+    recording = _make_recording()
+    widget = plot_fluorescence(
+        {"raw": recording, "zscore": zscore(recording)},
+        trace_color="tab:green",
+    )
+    colors = [line.get_color() for line in widget.ax.get_lines()]
+    assert colors == ["C0"] * 3 + ["C1"] * 3
+
+
+def test_dict_of_one_keeps_trace_color() -> None:
+    widget = plot_fluorescence(
+        {"raw": _make_recording()}, trace_color="tab:green"
+    )
+    for line in widget.ax.get_lines():
+        assert line.get_color() == "tab:green"
 
 
 def test_dict_with_different_timestamps_raises() -> None:
@@ -345,11 +363,29 @@ def test_group_with_wrong_number_of_axes_raises() -> None:
         plot_fluorescence(_make_group(), axes=axes)
 
 
-def test_group_default_window_clipped_to_short_segment() -> None:
-    widgets = plot_fluorescence(_make_group(duration_s=10.0))
-    green = widgets["green"]
-    assert green.ax.get_xlim() == pytest.approx((0.0, 60.0))
-    assert green.ax.get_lines()[0].get_xdata()[-1] < 10.0
+@pytest.mark.parametrize("overlay", [False, True])
+def test_group_default_window_clipped_to_short_segment(overlay) -> None:
+    """The window ends with the last color to end, not at 60 s."""
+    group = _make_group(duration_s=10.0)
+    widgets = plot_fluorescence(group, overlay=overlay)
+    iso_end = group["iso"].get_end_time()
+    for widget in widgets.values():
+        assert widget.ax.get_xlim() == pytest.approx((0.0, iso_end))
+
+
+def test_group_subplots_label_time_once() -> None:
+    """Stacked subplots share a time axis, labelled at the bottom only."""
+    widgets = plot_fluorescence(_make_group())
+    assert widgets["green"].ax.get_xlabel() == ""
+    assert widgets["iso"].ax.get_xlabel() == "time (s)"
+
+
+def test_group_into_given_axes_keeps_every_time_label() -> None:
+    """Axes the caller laid out may not be stacked; leave their labels."""
+    _, axes = plt.subplots(1, 2)
+    widgets = plot_fluorescence(_make_group(), axes=axes)
+    for widget in widgets.values():
+        assert widget.ax.get_xlabel() == "time (s)"
 
 
 def test_group_requires_segment_index_when_multi_segment() -> None:
@@ -428,3 +464,16 @@ def test_group_ipywidgets_overlay_raises(ipympl_backend) -> None:
         plot_fluorescence(
             _make_group(), backend="ipywidgets", overlay=True, display=False
         )
+
+
+def test_dict_ipywidgets_layer_keeps_its_color(ipympl_backend) -> None:
+    """Showing one layer alone must not recolor it as the first layer."""
+    recording = _make_recording()
+    widget = plot_fluorescence(
+        {"raw": recording, "zscore": zscore(recording)},
+        backend="ipywidgets",
+        display=False,
+    )
+    widget.layer_selector.value = "zscore"
+    colors = {line.get_color() for line in widget.ax.get_lines()}
+    assert colors == {"C1"}

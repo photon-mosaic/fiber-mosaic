@@ -79,6 +79,13 @@ class FiberTracesWidget(TracesWidget):
         self._center_traces = center_traces
         self._vspacing = vspacing
         self._vspacing_factor = vspacing_factor
+        # Upstream's layer palette runs to pale yellows; matplotlib's color
+        # cycle stays legible, and matches what an overlaid group uses.
+        self._cycle_layer_colors = (
+            isinstance(recording, dict)
+            and len(recording) > 1
+            and kwargs.get("color") is None
+        )
         TracesWidget.__init__(
             self, recording, vspacing_factor=vspacing_factor, **kwargs
         )
@@ -93,24 +100,32 @@ class FiberTracesWidget(TracesWidget):
             self.ax.set_ylabel("fiber")
 
     def _for_display(self, data_plot: dict) -> dict:
-        """Return a copy of ``data_plot`` centered and spaced for drawing.
+        """Return a copy of ``data_plot`` colored, centered and spaced.
 
         The spacing is sized once, from the first draw, and then reused:
         the ipywidgets scale control works by scaling the traces against a
         fixed spacing, so resizing it on every redraw would undo the scale.
         """
-        list_traces = data_plot["list_traces"]
+        data_plot = dict(data_plot)
+        if self._cycle_layer_colors:
+            # Index into every layer, not just those in view, so a layer
+            # keeps its color when the ipywidgets layer selector hides others.
+            keys = self.data_plot["layer_keys"]
+            data_plot["colors"] = {
+                key: dict.fromkeys(fibers, f"C{keys.index(key)}")
+                for key, fibers in data_plot["colors"].items()
+            }
         if self._center_traces:
-            list_traces = [_center(traces) for traces in list_traces]
-        if self._vspacing is None:
-            if not self._center_traces:
-                return data_plot
-            self._vspacing = _spacing(list_traces, self._vspacing_factor)
-        return {
-            **data_plot,
-            "list_traces": list_traces,
-            "vspacing": self._vspacing,
-        }
+            data_plot["list_traces"] = [
+                _center(traces) for traces in data_plot["list_traces"]
+            ]
+            if self._vspacing is None:
+                self._vspacing = _spacing(
+                    data_plot["list_traces"], self._vspacing_factor
+                )
+        if self._vspacing is not None:
+            data_plot["vspacing"] = self._vspacing
+        return data_plot
 
 
 def plot_fluorescence(
@@ -169,9 +184,10 @@ def plot_fluorescence(
         traces on a large baseline stay readable. Display only; see
         :class:`FiberTracesWidget`.
     trace_color : str, optional
-        A matplotlib color for every trace. Default is black, or one color
-        per recording when several share an axis; ignored with
-        ``overlay=True``, which always colors by color.
+        A matplotlib color for every trace of a recording, or of each group
+        subplot. Default is black. Ignored when several recordings share an
+        axis -- a dict, or a group with ``overlay=True`` -- which always
+        draws each recording in its own color.
     events : np.ndarray or list of np.ndarray, optional
         Event times in seconds, drawn as vertical lines; a structured array
         with a ``"duration"`` field draws spans instead. For multi-segment
@@ -259,6 +275,10 @@ def plot_fluorescence(
         time_range = _clip(
             _default_window(rec0, segment_index), rec0, segment_index
         )
+    if len(layers) > 1:
+        # Upstream would color only the first layer and draw the rest
+        # black; one color for every layer would hide which is which.
+        options["color"] = None
     return FiberTracesWidget(
         layers,
         segment_index=segment_index,
@@ -281,13 +301,17 @@ def _plot_group(
     rec0 = next(iter(recordings.values()))
     segment_index = _resolve_segment_index(rec0, segment_index)
     if time_range is None:
-        # Colors start within a frame or two of each other; the earliest
-        # start keeps every color's first samples in view.
+        # Colors start and end within a frame or two of each other; the
+        # earliest start and latest end keep every color's samples in view.
         t_start = min(
             rec.get_start_time(segment_index=segment_index)
             for rec in recordings.values()
         )
-        time_range = (t_start, t_start + DEFAULT_WINDOW_S)
+        t_end = max(
+            rec.get_end_time(segment_index=segment_index)
+            for rec in recordings.values()
+        )
+        time_range = (t_start, min(t_start + DEFAULT_WINDOW_S, t_end))
 
     # `label` is the photometry color; `color` in `overrides` is upstream's
     # trace color.
@@ -334,11 +358,12 @@ def _plot_group(
         return widgets
 
     axes = backend_kwargs.pop("axes", None)
-    if axes is None:
+    stacked = axes is None
+    if stacked:
         _, axes = plt.subplots(
             len(recordings), 1, sharex=True, squeeze=False, figsize=figsize
         )
-    return _subplots(draw, recordings, axes, time_range)
+    return _subplots(draw, recordings, axes, time_range, stacked)
 
 
 def _overlay(
@@ -360,9 +385,17 @@ def _overlay(
 
 
 def _subplots(
-    draw, recordings: dict, axes, time_range: Sequence[float]
+    draw,
+    recordings: dict,
+    axes,
+    time_range: Sequence[float],
+    stacked: bool,
 ) -> dict[str, FiberTracesWidget]:
-    """Draw each color on its own axis, titled by color."""
+    """Draw each color on its own axis, titled by color.
+
+    ``stacked`` axes share one time axis, labelled once at the bottom;
+    otherwise each axis's label would collide with the next one's title.
+    """
     axes = np.asarray(axes).ravel()
     if len(axes) != len(recordings):
         raise ValueError(
@@ -374,6 +407,9 @@ def _subplots(
         widgets[color] = draw(color, recording, ax=ax, add_legend=False)
         ax.set_title(color)
         ax.set_xlim(*time_range)
+    if stacked:
+        for ax in axes[:-1]:
+            ax.set_xlabel("")
     return widgets
 
 
