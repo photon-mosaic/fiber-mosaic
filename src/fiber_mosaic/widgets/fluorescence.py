@@ -399,7 +399,7 @@ def _layer_panels(
     layers = _as_layers(recording)
     rec0 = next(iter(layers.values()))
     segment_index = _resolve_segment_index(rec0, segment_index)
-    _check_shared_timebase(layers, segment_index)
+    _check_shared_timebase(layers)
     if time_range is None:
         time_range = _clip(
             _default_window(rec0, segment_index), rec0, segment_index
@@ -564,32 +564,43 @@ def _resolve_segment_index(
     return 0
 
 
-def _check_shared_timebase(
-    layers: dict[str, BaseRecording], segment_index: int
-) -> None:
+def _check_shared_timebase(layers: dict[str, BaseRecording]) -> None:
     """Raise unless every layer has the first layer's fibers and times.
 
     Upstream reads every layer at the first layer's frames and draws them
     against its times, so a layer on another timebase would be silently
     shifted. Colors usually are on another timebase; a group handles them.
+
+    Every segment is checked, not just the one drawn first: the ipywidgets
+    backend's segment selector can switch to any of them.
     """
     (key0, rec0), *rest = layers.items()
     fibers0 = list(rec0.get_channel_ids())
-    times0 = rec0.get_times(segment_index=segment_index)
+    num_segments = rec0.get_num_segments()
     for key, rec in rest:
         if list(rec.get_channel_ids()) != fibers0:
             raise ValueError(
                 f"recording {key!r} has different fiber_ids than {key0!r}; "
                 "recordings plotted together must share fibers"
             )
-        times = rec.get_times(segment_index=segment_index)
-        if not np.array_equal(times, times0):
+        if rec.get_num_segments() != num_segments:
             raise ValueError(
-                f"recording {key!r} has different timestamps than {key0!r}. "
-                "Recordings in a dict are drawn against shared timestamps; "
-                "to plot colors sampled at different times, pass them as a "
-                "FiberPhotometryRecordingGroup"
+                f"recording {key!r} has {rec.get_num_segments()} segments "
+                f"and {key0!r} has {num_segments}; recordings plotted "
+                "together must share segments"
             )
+        for segment_index in range(num_segments):
+            if not np.array_equal(
+                rec.get_times(segment_index=segment_index),
+                rec0.get_times(segment_index=segment_index),
+            ):
+                raise ValueError(
+                    f"recording {key!r} has different timestamps than "
+                    f"{key0!r} in segment {segment_index}. Recordings in a "
+                    "dict are drawn against shared timestamps; to plot "
+                    "colors sampled at different times, pass them as a "
+                    "FiberPhotometryRecordingGroup"
+                )
 
 
 def _default_window(

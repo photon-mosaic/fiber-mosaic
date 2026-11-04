@@ -312,6 +312,21 @@ class TestDictMatplotlib:
         with pytest.raises(ValueError, match="FiberPhotometryRecordingGroup"):
             FluorescenceWidget({"green": green, "iso": iso})
 
+    def test_different_timestamps_in_a_later_segment_raise(self):
+        """The ipywidgets segment selector can switch to any segment."""
+        first = _make_recording(n_segments=2)
+        second = _make_recording(n_segments=2)
+        shifted = second.get_times(segment_index=1) + 0.025
+        second.set_times(shifted, segment_index=1, with_warning=False)
+        with pytest.raises(ValueError, match="in segment 1"):
+            FluorescenceWidget({"a": first, "b": second}, segment_index=0)
+
+    def test_different_segment_counts_raise(self):
+        first = _make_recording(n_segments=2)
+        second = _make_recording(n_segments=1)
+        with pytest.raises(ValueError, match="share segments"):
+            FluorescenceWidget({"a": first, "b": second}, segment_index=0)
+
     def test_different_fibers_raise(self):
         first = _make_recording(n_fibers=3)
         second = _make_recording(n_fibers=2)
