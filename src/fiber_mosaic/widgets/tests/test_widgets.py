@@ -408,7 +408,7 @@ class TestGroupOverlay:
         assert all(tw.ax is ax for tw in widget.traces_widgets)
         assert len(ax.get_lines()) == 2 * 3
         assert _legend_texts(ax) == ["green", "iso"]
-        assert set(_line_colors(ax)) == {"C0", "C1"}
+        assert _line_colors(ax) == ["tab:green"] * 3 + ["tab:purple"] * 3
         assert ax.get_xlim() == pytest.approx((0.0, 60.0))
 
     def test_lines_fibers_up_across_colors(self):
@@ -445,6 +445,66 @@ class TestGroupOverlay:
         _, ax = plt.subplots()
         widget = FluorescenceWidget(group, overlay=True, ax=ax)
         assert widget.ax is ax
+
+
+# ---------------------------------------------------------------------------
+# FluorescenceWidget – traces drawn in their photometry color
+# ---------------------------------------------------------------------------
+
+
+class TestPhotometryColors:
+    @pytest.mark.parametrize(
+        "color, expected",
+        [
+            ("green", "tab:green"),
+            ("Red", "tab:red"),
+            ("iso", "tab:purple"),
+            ("isosbestic", "tab:purple"),
+            ("orange", "orange"),
+        ],
+    )
+    def test_recording_drawn_in_its_color(self, color, expected):
+        widget = FluorescenceWidget(_make_recording(color=color))
+        assert set(_line_colors(widget.ax)) == {expected}
+
+    def test_unknown_color_keeps_upstream_default(self):
+        default = FluorescenceWidget(_make_recording(color="signal_465"))
+        assert set(_line_colors(default.ax)) == {"k"}
+
+    def test_trace_color_overrides(self):
+        widget = FluorescenceWidget(
+            _make_recording(color="iso"), trace_color="black"
+        )
+        assert set(_line_colors(widget.ax)) == {"black"}
+
+    def test_dict_of_one_uses_its_color(self, recording):
+        widget = FluorescenceWidget({"raw": recording})
+        assert set(_line_colors(widget.ax)) == {"tab:green"}
+
+    def test_group_subplots(self, group):
+        green, iso = FluorescenceWidget(group).traces_widgets
+        assert set(_line_colors(green.ax)) == {"tab:green"}
+        assert set(_line_colors(iso.ax)) == {"tab:purple"}
+
+    def test_group_subplots_trace_color_overrides(self, group):
+        widget = FluorescenceWidget(group, trace_color="black")
+        for traces_widget in widget.traces_widgets:
+            assert set(_line_colors(traces_widget.ax)) == {"black"}
+
+    def test_overlay_falls_back_to_the_color_cycle(self):
+        """Unknown or repeated colors still get one distinct color each."""
+        group = FiberPhotometryRecordingGroup(
+            {
+                name: _make_recording(color=name)
+                for name in ("signal_465", "green", "Green")
+            }
+        )
+        lines = FluorescenceWidget(group, overlay=True).ax.get_lines()
+        assert [line.get_color() for line in lines[::3]] == [
+            "C0",
+            "tab:green",
+            "C2",
+        ]
 
 
 # ---------------------------------------------------------------------------

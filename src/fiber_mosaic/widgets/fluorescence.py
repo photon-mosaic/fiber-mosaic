@@ -33,6 +33,17 @@ from fiber_mosaic.core.base import FiberPhotometryRecordingGroup
 # samples on a photometry rig; a minute shows a few transients.
 DEFAULT_WINDOW_S = 60.0
 
+# Colors named after their light are drawn in it. The isosbestic channel is
+# ~405-415 nm excitation, so violet. Matched case-insensitively; any other
+# matplotlib color name is used as is.
+DISPLAY_COLORS = {
+    "green": "tab:green",
+    "red": "tab:red",
+    "blue": "tab:blue",
+    "iso": "tab:purple",
+    "isosbestic": "tab:purple",
+}
+
 
 class FiberTracesWidget(TracesWidget):
     """``TracesWidget`` with fiber labels and display centering.
@@ -177,9 +188,13 @@ class FluorescenceWidget(BaseWidget):
         :class:`FiberTracesWidget`.
     trace_color : str, optional
         A matplotlib color for every trace of a recording, or of each group
-        subplot. Default is black. Ignored when several recordings share an
-        axis -- a dict, or a group with ``overlay=True`` -- which always
-        draws each recording in its own color.
+        subplot. If None, a recording is drawn in its photometry color when
+        that names one -- ``"green"``, ``"red"``, ``"blue"``, ``"iso"``
+        (violet) or any matplotlib color name -- and in black otherwise.
+        Ignored when several recordings share an axis -- a dict, or a
+        group with ``overlay=True`` -- which always draws each recording in
+        its own color: its photometry color for an overlaid group, when it
+        names one, and matplotlib's color cycle otherwise.
     events : np.ndarray or list of np.ndarray, optional
         Event times in seconds, drawn as vertical lines; a structured array
         with a ``"duration"`` field draws spans instead. For multi-segment
@@ -394,6 +409,8 @@ def _layer_panels(
         # Upstream would color only the first layer and draw the rest
         # black; one color for every layer would hide which is which.
         draw["trace_color"] = None
+    elif draw["trace_color"] is None:
+        draw["trace_color"] = _display_color(rec0.get_annotation("color"))
     return segment_index, time_range, [dict(title=None, draws=[draw])]
 
 
@@ -432,7 +449,18 @@ def _group_panels(
 
     if not overlay:
         panels = [
-            dict(title=color, draws=[draw(color, recording, add_legend=False)])
+            dict(
+                title=color,
+                draws=[
+                    draw(
+                        color,
+                        recording,
+                        add_legend=False,
+                        trace_color=draw_options["trace_color"]
+                        or _display_color(color),
+                    )
+                ],
+            )
             for color, recording in recordings.items()
         ]
         return segment_index, time_range, panels
@@ -446,13 +474,41 @@ def _group_panels(
             color,
             recording,
             vspacing=vspacing,
-            trace_color=f"C{index}",
+            trace_color=trace_color,
             # Every color shares the axis; draw the events once.
             events=draw_options["events"] if index == 0 else None,
         )
-        for index, (color, recording) in enumerate(recordings.items())
+        for index, ((color, recording), trace_color) in enumerate(
+            zip(recordings.items(), _overlay_colors(recordings), strict=True)
+        )
     ]
     return segment_index, time_range, [dict(title=None, draws=draws)]
+
+
+def _display_color(color: str | None) -> str | None:
+    """Return the plot color for a photometry color, or None if unknown."""
+    from matplotlib.colors import is_color_like
+
+    if color is None:
+        return None
+    if color.lower() in DISPLAY_COLORS:
+        return DISPLAY_COLORS[color.lower()]
+    return color if is_color_like(color) else None
+
+
+def _overlay_colors(recordings: dict) -> list[str]:
+    """Return a distinct plot color per photometry color sharing an axis.
+
+    A color that names no plot color, or one already taken, falls back to
+    matplotlib's color cycle so every color stays distinguishable.
+    """
+    colors = []
+    for index, color in enumerate(recordings):
+        display = _display_color(color)
+        colors.append(
+            f"C{index}" if display is None or display in colors else display
+        )
+    return colors
 
 
 def _traces_kwargs(dp, draw: dict) -> dict:
