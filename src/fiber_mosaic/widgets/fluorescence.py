@@ -8,7 +8,9 @@ electrophysiology's. This module keeps the machinery and changes the rest:
 - FiberTracesWidget: ``TracesWidget`` with fiber labels and display
   centering, applied in ``plot_matplotlib`` so they survive the redraws the
   ipywidgets backend makes on every slider move.
-- plot_fluorescence: the public function, in fiber-photometry vocabulary.
+- FluorescenceWidget: the public widget, in fiber-photometry vocabulary,
+  exposed as ``plot_fluorescence`` following SpikeInterface's convention.
+  It draws each axis with a FiberTracesWidget.
 """
 
 from __future__ import annotations
@@ -17,8 +19,13 @@ from collections.abc import Sequence
 
 import numpy as np
 from spikeinterface.core import BaseRecording
-from spikeinterface.widgets.base import get_default_plotter_backend
+from spikeinterface.widgets.base import (
+    BaseWidget,
+    get_default_plotter_backend,
+    to_attr,
+)
 from spikeinterface.widgets.traces import TracesWidget
+from spikeinterface.widgets.utils_matplotlib import make_mpl_figure
 
 from fiber_mosaic.core.base import FiberPhotometryRecordingGroup
 
@@ -128,26 +135,8 @@ class FiberTracesWidget(TracesWidget):
         return data_plot
 
 
-def plot_fluorescence(
-    recording: BaseRecording | dict | FiberPhotometryRecordingGroup,
-    segment_index: int | None = None,
-    fiber_ids: Sequence | None = None,
-    time_range: Sequence[float] | None = None,
-    overlay: bool = False,
-    show_fiber_ids: bool = True,
-    center_traces: bool = True,
-    trace_color: str | None = None,
-    events: np.ndarray | list[np.ndarray] | None = None,
-    events_color: str = "gray",
-    events_alpha: float = 0.5,
-    scale: float = 1.0,
-    vspacing_factor: float = 1.5,
-    add_legend: bool = True,
-    backend: str | None = None,
-    **backend_kwargs,
-) -> FiberTracesWidget | dict[str, FiberTracesWidget]:
-    """
-    Plot fluorescence traces for one or more fibers.
+class FluorescenceWidget(BaseWidget):
+    """Widget for visualizing fluorescence traces of one or more fibers.
 
     Works on any recording -- an extractor's raw output or the result of a
     processing step -- and stacks the selected fibers on a time axis. What
@@ -162,6 +151,9 @@ def plot_fluorescence(
       the time axis, or with ``overlay=True`` all colors on one axis. Each
       color is drawn on its own timestamps, so colors sampled at different
       times stay aligned.
+
+    Each axis is drawn by a :class:`FiberTracesWidget`; they are kept, in
+    drawing order, in ``traces_widgets``.
 
     Parameters
     ----------
@@ -208,18 +200,11 @@ def plot_fluorescence(
         Plotting backend. Defaults to SpikeInterface's default backend,
         normally ``"matplotlib"``. ``"ipywidgets"`` needs
         ``%matplotlib widget`` in a notebook, and draws a group as one
-        interactive widget per color.
+        interactive plot per color.
     **backend_kwargs
-        Passed to the backend, e.g. ``ax`` or ``figsize`` for matplotlib,
-        ``width_cm`` or ``height_cm`` for ipywidgets. Group subplots take
-        ``axes``, one per color, instead of ``ax``.
-
-    Returns
-    -------
-    FiberTracesWidget or dict of FiberTracesWidget
-        For a recording or a dict, the widget; its ``figure`` and ``ax``
-        hold the matplotlib objects. For a group, a dict mapping each
-        color to its widget.
+        Passed to the backend, e.g. ``ax``, ``axes`` (one per group color)
+        or ``figsize`` for matplotlib, ``width_cm`` or ``height_cm`` for
+        ipywidgets.
 
     Raises
     ------
@@ -228,8 +213,9 @@ def plot_fluorescence(
         group.
     ValueError
         If a dict's recordings do not share fibers and timestamps, if
-        ``overlay`` is set for anything but a group, or if a group is
-        overlaid with a backend other than matplotlib.
+        ``overlay`` is set for anything but a group, if a group is
+        overlaid with the ipywidgets backend, or if ``axes`` does not hold
+        one axis per group color.
 
     Examples
     --------
@@ -238,35 +224,163 @@ def plot_fluorescence(
     >>> plot_fluorescence({"raw": recording, "zscore": zscore(recording)})
     >>> plot_fluorescence(group, overlay=True)
     """
-    options = dict(
-        channel_ids=fiber_ids,
-        mode="line",
-        show_channel_ids=show_fiber_ids,
-        center_traces=center_traces,
-        events=events,
-        events_color=events_color,
-        events_alpha=events_alpha,
-        color=trace_color,
-        scale=scale,
-        vspacing_factor=vspacing_factor,
-        add_legend=add_legend,
-        backend=backend,
-    )
-    if isinstance(recording, FiberPhotometryRecordingGroup):
-        return _plot_group(
-            recording,
-            segment_index,
-            time_range,
-            overlay,
-            options,
-            backend_kwargs,
+
+    def __init__(
+        self,
+        recording: BaseRecording | dict | FiberPhotometryRecordingGroup,
+        segment_index: int | None = None,
+        fiber_ids: Sequence | None = None,
+        time_range: Sequence[float] | None = None,
+        overlay: bool = False,
+        show_fiber_ids: bool = True,
+        center_traces: bool = True,
+        trace_color: str | None = None,
+        events: np.ndarray | list[np.ndarray] | None = None,
+        events_color: str = "gray",
+        events_alpha: float = 0.5,
+        scale: float = 1.0,
+        vspacing_factor: float = 1.5,
+        add_legend: bool = True,
+        backend: str | None = None,
+        **backend_kwargs,
+    ):
+        draw_options = dict(
+            trace_color=trace_color, events=events, add_legend=add_legend
+        )
+        if isinstance(recording, FiberPhotometryRecordingGroup):
+            if overlay and (
+                (backend or get_default_plotter_backend()) == "ipywidgets"
+            ):
+                raise ValueError(
+                    "overlay=True needs the matplotlib backend; the "
+                    "ipywidgets backend draws a group as one plot per color"
+                )
+            spacing_options = dict(
+                fiber_ids=fiber_ids,
+                center_traces=center_traces,
+                scale=scale,
+                vspacing_factor=vspacing_factor,
+            )
+            segment_index, time_range, panels = _group_panels(
+                recording,
+                segment_index,
+                time_range,
+                overlay,
+                draw_options,
+                spacing_options,
+            )
+        else:
+            if overlay:
+                raise ValueError(
+                    "overlay applies to a FiberPhotometryRecordingGroup; a "
+                    "recording or a dict is already drawn on one axis"
+                )
+            segment_index, time_range, panels = _layer_panels(
+                recording, segment_index, time_range, draw_options
+            )
+
+        # Prepare data for plotting
+        data_plot = dict(
+            panels=panels,
+            segment_index=segment_index,
+            fiber_ids=fiber_ids,
+            time_range=time_range,
+            show_fiber_ids=show_fiber_ids,
+            center_traces=center_traces,
+            events_color=events_color,
+            events_alpha=events_alpha,
+            scale=scale,
+            vspacing_factor=vspacing_factor,
         )
 
-    if overlay:
-        raise ValueError(
-            "overlay applies to a FiberPhotometryRecordingGroup; a "
-            "recording or a dict is already drawn on one axis"
+        BaseWidget.__init__(self, data_plot, backend=backend, **backend_kwargs)
+
+    def plot_matplotlib(self, data_plot, **backend_kwargs):
+        """Matplotlib backend: one axis per panel, drawn by TracesWidgets."""
+        dp = to_attr(data_plot)
+
+        num_panels = len(dp.panels)
+        stacked = num_panels > 1 and all(
+            backend_kwargs[key] is None for key in ("figure", "ax", "axes")
         )
+        if num_panels > 1:
+            backend_kwargs.update(num_axes=num_panels, ncols=1)
+        self.figure, self.axes, self.ax = make_mpl_figure(**backend_kwargs)
+
+        axes = [ax for ax in np.asarray(self.axes).ravel() if ax is not None]
+        if len(axes) != num_panels:
+            raise ValueError(
+                f"axes must hold one axis per color ({num_panels}), "
+                f"got {len(axes)}"
+            )
+
+        self.traces_widgets = []
+        for ax, panel in zip(axes, dp.panels, strict=True):
+            for draw in panel["draws"]:
+                self.traces_widgets.append(
+                    FiberTracesWidget(
+                        draw["layers"],
+                        backend="matplotlib",
+                        ax=ax,
+                        **_traces_kwargs(dp, draw),
+                    )
+                )
+            if panel["title"] is not None:
+                ax.set_title(panel["title"])
+            ax.set_xlim(*dp.time_range)
+
+        if stacked:
+            # Stacked panels share one time axis, labelled at the bottom;
+            # otherwise each label would collide with the next title.
+            for ax in axes[:-1]:
+                ax.sharex(axes[-1])
+                ax.set_xlabel("")
+
+    def plot_ipywidgets(self, data_plot, **backend_kwargs):
+        """Interactive ipywidgets plot: one TracesWidget per panel."""
+        import ipywidgets as widgets
+        from IPython.display import display
+
+        dp = to_attr(data_plot)
+
+        self.traces_widgets = []
+        children = []
+        for panel in dp.panels:
+            # Overlaid panels hold several draws; __init__ rejects them
+            # here, as each ipywidgets plot makes its own figure.
+            (draw,) = panel["draws"]
+            traces_widget = FiberTracesWidget(
+                draw["layers"],
+                backend="ipywidgets",
+                width_cm=backend_kwargs["width_cm"],
+                height_cm=backend_kwargs["height_cm"],
+                display=False,
+                **_traces_kwargs(dp, draw),
+            )
+            self.traces_widgets.append(traces_widget)
+            if panel["title"] is not None:
+                children.append(widgets.Label(value=panel["title"]))
+            children.append(traces_widget.widget)
+
+        self.widget = (
+            children[0] if len(children) == 1 else widgets.VBox(children)
+        )
+
+        # Display if requested
+        if backend_kwargs["display"]:
+            display(self.widget)
+
+
+plot_fluorescence = FluorescenceWidget
+
+
+def _layer_panels(
+    recording,
+    segment_index: int | None,
+    time_range: Sequence[float] | None,
+    draw_options: dict,
+) -> tuple[int, Sequence[float], list[dict]]:
+    """Return one panel drawing a recording, or a dict as layers."""
     layers = _as_layers(recording)
     rec0 = next(iter(layers.values()))
     segment_index = _resolve_segment_index(rec0, segment_index)
@@ -275,28 +389,23 @@ def plot_fluorescence(
         time_range = _clip(
             _default_window(rec0, segment_index), rec0, segment_index
         )
+    draw = dict(draw_options, layers=layers, time_range=time_range)
     if len(layers) > 1:
         # Upstream would color only the first layer and draw the rest
         # black; one color for every layer would hide which is which.
-        options["color"] = None
-    return FiberTracesWidget(
-        layers,
-        segment_index=segment_index,
-        time_range=time_range,
-        **options,
-        **backend_kwargs,
-    )
+        draw["trace_color"] = None
+    return segment_index, time_range, [dict(title=None, draws=[draw])]
 
 
-def _plot_group(
+def _group_panels(
     group: FiberPhotometryRecordingGroup,
     segment_index: int | None,
     time_range: Sequence[float] | None,
     overlay: bool,
-    options: dict,
-    backend_kwargs: dict,
-) -> dict[str, FiberTracesWidget]:
-    """Draw a group as one subplot per color, or overlaid on one axis."""
+    draw_options: dict,
+    spacing_options: dict,
+) -> tuple[int, Sequence[float], list[dict]]:
+    """Return one panel per color, or one panel overlaying them all."""
     recordings = dict(group.items())
     rec0 = next(iter(recordings.values()))
     segment_index = _resolve_segment_index(rec0, segment_index)
@@ -313,104 +422,57 @@ def _plot_group(
         )
         time_range = (t_start, min(t_start + DEFAULT_WINDOW_S, t_end))
 
-    # `label` is the photometry color; `color` in `overrides` is upstream's
-    # trace color.
-    def draw(label, recording, **overrides):
-        kwargs = {**options, **backend_kwargs, **overrides}
-        return FiberTracesWidget(
-            {label: recording},
-            segment_index=segment_index,
+    def draw(color, recording, **overrides):
+        return dict(
+            draw_options,
+            layers={color: recording},
             time_range=_clip(time_range, recording, segment_index),
-            **kwargs,
+            **overrides,
         )
 
-    backend = options["backend"] or get_default_plotter_backend()
-    if backend == "ipywidgets":
-        if overlay:
-            raise ValueError(
-                "overlay=True needs the matplotlib backend; the ipywidgets "
-                "backend draws a group as one widget per color"
-            )
-        return {
-            color: draw(color, recording)
+    if not overlay:
+        panels = [
+            dict(title=color, draws=[draw(color, recording, add_legend=False)])
             for color, recording in recordings.items()
-        }
-    if backend != "matplotlib":
-        raise ValueError(
-            "a FiberPhotometryRecordingGroup can be drawn with the "
-            f"matplotlib or ipywidgets backend, got {backend!r}"
-        )
+        ]
+        return segment_index, time_range, panels
 
-    import matplotlib.pyplot as plt
-
-    backend_kwargs = dict(backend_kwargs)
-    figsize = backend_kwargs.pop("figsize", None)
-    if overlay:
-        ax = backend_kwargs.pop("ax", None)
-        if ax is None:
-            _, ax = plt.subplots(figsize=figsize)
-        # One spacing for every color, so each fiber's traces share a row.
-        vspacing = _shared_vspacing(
-            recordings.values(), segment_index, time_range, options
-        )
-        widgets = _overlay(draw, recordings, ax, vspacing, options["events"])
-        ax.set_xlim(*time_range)
-        return widgets
-
-    axes = backend_kwargs.pop("axes", None)
-    stacked = axes is None
-    if stacked:
-        _, axes = plt.subplots(
-            len(recordings), 1, sharex=True, squeeze=False, figsize=figsize
-        )
-    return _subplots(draw, recordings, axes, time_range, stacked)
-
-
-def _overlay(
-    draw, recordings: dict, ax, vspacing: float, events
-) -> dict[str, FiberTracesWidget]:
-    """Draw every color on ``ax``, one matplotlib color cycle entry each."""
-    widgets = {}
-    for index, (color, recording) in enumerate(recordings.items()):
-        widgets[color] = draw(
+    # One spacing for every color, so each fiber's traces share a row.
+    vspacing = _shared_vspacing(
+        recordings.values(), segment_index, time_range, **spacing_options
+    )
+    draws = [
+        draw(
             color,
             recording,
-            ax=ax,
             vspacing=vspacing,
-            color=f"C{index}",
+            trace_color=f"C{index}",
             # Every color shares the axis; draw the events once.
-            events=events if index == 0 else None,
+            events=draw_options["events"] if index == 0 else None,
         )
-    return widgets
+        for index, (color, recording) in enumerate(recordings.items())
+    ]
+    return segment_index, time_range, [dict(title=None, draws=draws)]
 
 
-def _subplots(
-    draw,
-    recordings: dict,
-    axes,
-    time_range: Sequence[float],
-    stacked: bool,
-) -> dict[str, FiberTracesWidget]:
-    """Draw each color on its own axis, titled by color.
-
-    ``stacked`` axes share one time axis, labelled once at the bottom;
-    otherwise each axis's label would collide with the next one's title.
-    """
-    axes = np.asarray(axes).ravel()
-    if len(axes) != len(recordings):
-        raise ValueError(
-            f"axes must hold one axis per color ({len(recordings)}), "
-            f"got {len(axes)}"
-        )
-    widgets = {}
-    for ax, (color, recording) in zip(axes, recordings.items(), strict=True):
-        widgets[color] = draw(color, recording, ax=ax, add_legend=False)
-        ax.set_title(color)
-        ax.set_xlim(*time_range)
-    if stacked:
-        for ax in axes[:-1]:
-            ax.set_xlabel("")
-    return widgets
+def _traces_kwargs(dp, draw: dict) -> dict:
+    """Translate one draw into FiberTracesWidget's (upstream's) arguments."""
+    return dict(
+        segment_index=dp.segment_index,
+        channel_ids=dp.fiber_ids,
+        time_range=draw["time_range"],
+        mode="line",
+        show_channel_ids=dp.show_fiber_ids,
+        center_traces=dp.center_traces,
+        vspacing=draw.get("vspacing"),
+        vspacing_factor=dp.vspacing_factor,
+        events=draw["events"],
+        events_color=dp.events_color,
+        events_alpha=dp.events_alpha,
+        color=draw["trace_color"],
+        scale=dp.scale,
+        add_legend=draw["add_legend"],
+    )
 
 
 def _as_layers(recording) -> dict[str, BaseRecording]:
@@ -503,7 +565,13 @@ def _spacing(list_traces: list[np.ndarray], vspacing_factor: float) -> float:
 
 
 def _shared_vspacing(
-    recordings, segment_index: int, time_range: Sequence[float], options: dict
+    recordings,
+    segment_index: int,
+    time_range: Sequence[float],
+    fiber_ids: Sequence | None,
+    center_traces: bool,
+    scale: float,
+    vspacing_factor: float,
 ) -> float:
     """Size one spacing from every recording's traces in ``time_range``.
 
@@ -527,10 +595,10 @@ def _shared_vspacing(
             segment_index=segment_index,
             start_frame=start,
             end_frame=end,
-            channel_ids=options["channel_ids"],
+            channel_ids=fiber_ids,
         )
-        traces = traces * options["scale"]
-        if options["center_traces"]:
+        traces = traces * scale
+        if center_traces:
             traces = _center(traces)
         list_traces.append(traces)
-    return _spacing(list_traces, options["vspacing_factor"])
+    return _spacing(list_traces, vspacing_factor)
