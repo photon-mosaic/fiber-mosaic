@@ -19,17 +19,18 @@ dependencies = [
      'numpy',
      'pandas',
      'scipy',
-     'spikeinterface>=0.105.0',
+     'spikeinterface>=0.106.0',
 ]
 
 [project.optional-dependencies]
 # Format-specific readers that rely on optional third-party libraries.
 doric = ['h5py']
-nwb = ['pynwb']
+nwb = ['pynwb', 'neuroconv[fiber_photometry_minimal] @ git+https://github.com/catalystneuro/neuroconv.git@main']
 dev = [
     'coverage',
     'furo',
     'h5py',
+    'neuroconv[fiber_photometry_minimal] @ git+https://github.com/catalystneuro/neuroconv.git@main',
     'pynwb',
     'pytest',
     'pytest-cov',
