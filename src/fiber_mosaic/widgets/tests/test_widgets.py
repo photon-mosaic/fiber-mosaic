@@ -468,7 +468,7 @@ class TestGroupOverlay:
         group = FiberPhotometryRecordingGroup(
             {
                 color: _make_recording(color=color, duration_s=seconds)
-                for color, seconds in (("red", 30), ("iso", 20), ("green", 10))
+                for color, seconds in (("iso", 20), ("red", 30), ("green", 10))
             }
         )
         widget = FluorescenceWidget(
@@ -479,7 +479,7 @@ class TestGroupOverlay:
         )
         axes = np.asarray(widget.axes).ravel()
         assert [len(ax.get_lines()) for ax in axes] == (
-            [7] if overlay else [4, 3, 0]
+            [7] if overlay else [3, 4, 0]
         )
         # the bottom panel is blank, but still labelled
         assert axes[-1].get_xlabel() == "time (s)"
