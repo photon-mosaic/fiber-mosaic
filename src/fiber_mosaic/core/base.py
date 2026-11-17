@@ -9,7 +9,7 @@ This module provides the base classes that form the foundation of fiber-mosaic:
 - FiberPhotometryRecordingGroup: Named recordings sharing fibers
 - recording_from_traces: General-purpose constructor for wrapping plain numpy
   arrays as a fiber-native recording (mixes FiberPhotometryMixin into SI's
-  own NumpyRecording -- used by :mod:`fiber_mosaic.synthetic` but not
+  own NumpyRecording -- used by :mod:`fiber_mosaic.generation` but not
   specific to synthetic data)
 """
 

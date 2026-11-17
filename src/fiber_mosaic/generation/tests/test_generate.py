@@ -1,4 +1,4 @@
-"""Pytest tests for ``fiber_mosaic.synthetic.generate``."""
+"""Pytest tests for ``fiber_mosaic.generation.generate``."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from fiber_mosaic.core.base import (
     FiberPhotometryRecordingGroup,
     recording_from_traces,
 )
-from fiber_mosaic.synthetic import (
+from fiber_mosaic.generation import (
     simulate_bands,
     simulate_group,
 )
