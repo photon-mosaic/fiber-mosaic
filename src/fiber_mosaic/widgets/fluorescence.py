@@ -15,8 +15,10 @@ electrophysiology's. This module keeps the machinery and changes the rest:
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 
+import matplotlib as mpl
 import numpy as np
 from spikeinterface.core import BaseRecording
 from spikeinterface.widgets.base import (
@@ -349,7 +351,7 @@ class FluorescenceWidget(BaseWidget):
             # otherwise each label would collide with the next title.
             for ax in axes[:-1]:
                 ax.sharex(axes[-1])
-                ax.set_xlabel("")
+                ax.label_outer()
 
     def plot_ipywidgets(self, data_plot, **backend_kwargs):
         """Interactive ipywidgets plot: one TracesWidget per panel."""
@@ -360,7 +362,7 @@ class FluorescenceWidget(BaseWidget):
 
         self.traces_widgets = []
         children = []
-        for panel in dp.panels:
+        for panel in (p for p in dp.panels if p["draws"]):
             # Overlaid panels hold several draws; __init__ rejects them
             # here, as each ipywidgets plot makes its own figure.
             (draw,) = panel["draws"]
@@ -404,6 +406,8 @@ def _layer_panels(
         time_range = _clip(
             _default_window(rec0, segment_index), rec0, segment_index
         )
+    if not _has_samples(time_range, rec0, segment_index):
+        raise ValueError(f"time_range {tuple(time_range)} has no samples")
     draw = dict(draw_options, layers=layers, time_range=time_range)
     if len(layers) > 1:
         # Upstream would color only the first layer and draw the rest
@@ -447,6 +451,15 @@ def _group_panels(
             **overrides,
         )
 
+    # A color with no samples in the window is left blank.
+    live = {
+        color: recording
+        for color, recording in recordings.items()
+        if _has_samples(time_range, recording, segment_index)
+    }
+    if not live:
+        raise ValueError(f"time_range {tuple(time_range)} has no samples")
+
     if not overlay:
         panels = [
             dict(
@@ -459,7 +472,9 @@ def _group_panels(
                         trace_color=draw_options["trace_color"]
                         or _display_color(color),
                     )
-                ],
+                ]
+                if color in live
+                else [],
             )
             for color, recording in recordings.items()
         ]
@@ -467,20 +482,25 @@ def _group_panels(
 
     # One spacing for every color, so each fiber's traces share a row.
     vspacing = _shared_vspacing(
-        recordings.values(), segment_index, time_range, **spacing_options
+        live.values(), segment_index, time_range, **spacing_options
     )
+    colors = dict(zip(recordings, _overlay_colors(recordings), strict=True))
+
+    def span(color):
+        start, end = _clip(time_range, live[color], segment_index)
+        return end - start
+
+    # Events go on the longest color: upstream drops those out of its range.
+    longest = max(live, key=span)
     draws = [
         draw(
             color,
             recording,
             vspacing=vspacing,
-            trace_color=trace_color,
-            # Every color shares the axis; draw the events once.
-            events=draw_options["events"] if index == 0 else None,
+            trace_color=colors[color],
+            events=draw_options["events"] if color == longest else None,
         )
-        for index, ((color, recording), trace_color) in enumerate(
-            zip(recordings.items(), _overlay_colors(recordings), strict=True)
-        )
+        for color, recording in live.items()
     ]
     return segment_index, time_range, [dict(title=None, draws=draws)]
 
@@ -499,15 +519,20 @@ def _display_color(color: str | None) -> str | None:
 def _overlay_colors(recordings: dict) -> list[str]:
     """Return a distinct plot color per photometry color sharing an axis.
 
-    A color that names no plot color, or one already taken, falls back to
-    matplotlib's color cycle so every color stays distinguishable.
+    Unknown or already-rendered colors take the first unused cycle color.
     """
-    colors = []
-    for index, color in enumerate(recordings):
+    from matplotlib.colors import to_hex
+
+    cycle = [f"C{i}" for i in range(len(mpl.rcParams["axes.prop_cycle"]))]
+    colors, used = [], set()
+    for color in recordings:
         display = _display_color(color)
-        colors.append(
-            f"C{index}" if display is None or display in colors else display
-        )
+        if display is None or to_hex(display) in used:
+            display = next(
+                (c for c in cycle if to_hex(c) not in used), cycle[0]
+            )
+        colors.append(display)
+        used.add(to_hex(display))
     return colors
 
 
@@ -619,14 +644,30 @@ def _clip(
     return time_range[0], min(time_range[1], t_end)
 
 
+def _has_samples(
+    time_range: Sequence[float], recording: BaseRecording, segment_index: int
+) -> bool:
+    """Return whether ``recording`` has samples inside ``time_range``."""
+    start = max(
+        time_range[0], recording.get_start_time(segment_index=segment_index)
+    )
+    end = min(
+        time_range[1], recording.get_end_time(segment_index=segment_index)
+    )
+    return start < end
+
+
 def _center(traces: np.ndarray) -> np.ndarray:
-    """Subtract each fiber's median."""
-    return traces - np.median(traces, axis=0)
+    """Subtract each fiber's median, ignoring NaN."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)  # an all-NaN fiber
+        return traces - np.nanmedian(traces, axis=0)
 
 
 def _spacing(list_traces: list[np.ndarray], vspacing_factor: float) -> float:
     """Size the spacing from the largest amplitude across ``list_traces``."""
-    amplitude = max(float(np.max(np.abs(traces))) for traces in list_traces)
+    finite = (np.abs(traces[np.isfinite(traces)]) for traces in list_traces)
+    amplitude = max((float(a.max()) for a in finite if a.size), default=0.0)
     # A flat trace has no amplitude to size from; any spacing works.
     return amplitude * vspacing_factor if amplitude > 0 else 1.0
 
