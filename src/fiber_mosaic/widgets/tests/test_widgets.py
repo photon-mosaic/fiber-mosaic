@@ -223,13 +223,15 @@ class TestTimeRange:
         assert widget.ax.get_xlim() == pytest.approx((10.0, 30.0))
 
     def test_window_without_samples_raises(self, recording, group):
+        # past the end, between samples
         for source in (recording, group):
-            for time_range in (
-                (500, 600),
-                (0.011, 0.012),
-            ):  # past the end, between samples
+            for time_range in ((500, 600), (0.011, 0.012)):
                 with pytest.raises(ValueError, match="has no samples"):
                     FluorescenceWidget(source, time_range=time_range)
+        with pytest.raises(ValueError, match="has no samples"):
+            FluorescenceWidget(
+                recording, time_range=(119.95, 130)
+            )  # last sample
 
     def test_multi_segment_requires_segment_index(self):
         with pytest.raises(ValueError, match="segment_index"):
@@ -467,7 +469,7 @@ class TestGroupOverlay:
         group = FiberPhotometryRecordingGroup(
             {
                 color: _make_recording(color=color, duration_s=seconds)
-                for color, seconds in (("green", 10), ("iso", 20), ("red", 30))
+                for color, seconds in (("red", 30), ("iso", 20), ("green", 10))
             }
         )
         widget = FluorescenceWidget(
@@ -476,8 +478,13 @@ class TestGroupOverlay:
             events=np.array([25.0]),
             overlay=overlay,
         )
-        lines = [len(ax.get_lines()) for ax in np.asarray(widget.axes).ravel()]
-        assert lines == ([7] if overlay else [0, 3, 4])
+        axes = np.asarray(widget.axes).ravel()
+        assert [len(ax.get_lines()) for ax in axes] == (
+            [7] if overlay else [4, 3, 0]
+        )
+        assert (
+            axes[-1].get_xlabel() == "time (s)"
+        )  # even if that panel is blank
 
     def test_draws_events_once(self, group):
         widget = FluorescenceWidget(

@@ -353,6 +353,7 @@ class FluorescenceWidget(BaseWidget):
             for ax in axes[:-1]:
                 ax.sharex(axes[-1])
                 ax.label_outer()
+            axes[-1].set_xlabel("time (s)")  # also when that panel is blank
 
     def plot_ipywidgets(self, data_plot, **backend_kwargs):
         """Interactive ipywidgets plot: one TracesWidget per panel."""
@@ -648,7 +649,8 @@ def _clip(
 def _has_samples(
     time_range: Sequence[float], recording: BaseRecording, segment_index: int
 ) -> bool:
-    """Return whether ``time_range`` selects any frame of ``recording``."""
+    """Return whether ``time_range``, clipped as drawn, selects any frame."""
+    time_range = _clip(time_range, recording, segment_index)
     num_samples = recording.get_num_samples(segment_index=segment_index)
     start, end = (
         int(
