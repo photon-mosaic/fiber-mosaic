@@ -19,7 +19,9 @@ def dump_recording(recording: BaseRecording, file_path: str | Path) -> Path:
     """Write ``recording`` to a SpikeInterface JSON file.
 
     The file holds no samples, only how to rebuild the recording from its
-    source files, which must stay where they are.
+    source files, which must stay where they are. All properties are
+    written, so per-fiber metadata set with ``set_property`` (e.g.
+    ``fiber_location``) survives the round trip.
 
     Parameters
     ----------
@@ -33,7 +35,7 @@ def dump_recording(recording: BaseRecording, file_path: str | Path) -> Path:
     Path
         ``file_path``, ready for ``FiberMosaicPhotometryInterface``.
     """
-    recording.dump_to_json(file_path)
+    recording.dump_to_json(file_path, include_properties=True)
     return Path(file_path)
 
 
