@@ -251,10 +251,12 @@ class TestTimeRange:
             segment_index=0,
             with_warning=False,
         )
-        widget = FluorescenceWidget(recording, time_range=(105, 125))
-        assert widget.ax.get_lines()[0].get_xdata().max() == pytest.approx(
-            124.95
+        widget = FluorescenceWidget(
+            recording, time_range=(105, 125), events=np.array([122.0])
         )
+        lines = widget.ax.get_lines()
+        assert lines[0].get_xdata().max() == pytest.approx(124.95)
+        assert len(lines) == 3 + 1  # three fibers and the event
 
 
 # ---------------------------------------------------------------------------
@@ -600,8 +602,8 @@ class TestIpywidgets:
         assert swing_after == pytest.approx(2 * swing_before)
 
     def test_starts_on_the_requested_segment_and_scale(self, ipympl_backend):
-        """Upstream's controls start at segment 0 (maybe shorter), scale 1."""
-        recording = _make_recording(duration_s=5.0)
+        """Upstream's controls start at segment 0, scale 1, window <= 30 s."""
+        recording = _make_recording(duration_s=5.0)  # shorter than the window
         recording.add_segment(
             NumpyRecordingSegment(
                 traces=_make_recording(duration_s=60.0).get_traces(),
@@ -609,16 +611,24 @@ class TestIpywidgets:
                 t_start=None,
             )
         )
+        for segment in (0, 1):
+            recording.set_times(
+                recording.get_times(segment_index=segment),
+                segment_index=segment,
+                with_warning=False,
+            )
         widget = FluorescenceWidget(
             recording,
             segment_index=1,
+            time_range=(10, 50),
             scale=2,
             backend="ipywidgets",
             display=False,
         )
         (traces_widget,) = widget.traces_widgets
         line = traces_widget.ax.get_lines()[0]
-        assert line.get_xdata().max() > 5.0  # segment 1 is drawn
+        times = line.get_xdata()
+        assert (times[0], times[-1]) == pytest.approx((10, 49.95))
         assert np.ptp(line.get_ydata()) == pytest.approx(12.0, rel=0.01)
 
     def test_dict_layer_keeps_its_color(self, ipympl_backend, recording):

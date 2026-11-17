@@ -112,18 +112,32 @@ class FiberTracesWidget(TracesWidget):
             self, recording, vspacing_factor=vspacing_factor, **kwargs
         )
 
+    def plot_ipywidgets(self, data_plot, **backend_kwargs):
+        """Build upstream's controls on a window that exists in segment 0."""
+        start, end = data_plot["frame_range"]
+        data_plot = dict(data_plot, frame_range=(0, end - start))
+        TracesWidget.plot_ipywidgets(self, data_plot, **backend_kwargs)
+
     def _retrieve_traces(self, change=None):
-        # Upstream draws once from controls it starts at segment 0, scale 1.
+        # Upstream draws once from controls it starts at segment 0, scale 1
+        # and a window of at most 30 s.
         if not self._controls_synced:
             self._controls_synced = True
+            slider = self.time_slider
+            start, end = (int(f) for f in self.data_plot["frame_range"])
+            duration = (end - start) / slider.sampling_frequency
+            slider.window_sizer.max = max(slider.window_sizer.max, duration)
+            slider.window_sizer.value = duration
             self.scaler.value = self._scale
-            start, end = self.data_plot["frame_range"]
-            segment = self.data_plot["segment_index"]
-            self.time_slider.value = (int(start), int(end), segment)
+            slider.value = (start, end, self.data_plot["segment_index"])
         TracesWidget._retrieve_traces(self, change)
 
     def plot_matplotlib(self, data_plot, **backend_kwargs):
         """Draw with upstream's plotter, then apply fiber labels."""
+        # time_range selects frames on the nominal grid; events and the
+        # limits are in the recording's times.
+        times = data_plot["times_in_range"]
+        data_plot = dict(data_plot, time_range=(times[0], times[-1]))
         line_mode = data_plot["mode"] == "line"
         if line_mode:
             data_plot = self._for_display(data_plot)
