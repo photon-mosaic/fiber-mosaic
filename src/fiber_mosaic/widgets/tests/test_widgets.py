@@ -228,10 +228,9 @@ class TestTimeRange:
             for time_range in ((500, 600), (0.011, 0.012)):
                 with pytest.raises(ValueError, match="has no samples"):
                     FluorescenceWidget(source, time_range=time_range)
+        # a window starting at the last sample (119.95 s)
         with pytest.raises(ValueError, match="has no samples"):
-            FluorescenceWidget(
-                recording, time_range=(119.95, 130)
-            )  # last sample
+            FluorescenceWidget(recording, time_range=(119.95, 130))
 
     def test_multi_segment_requires_segment_index(self):
         with pytest.raises(ValueError, match="segment_index"):
@@ -482,9 +481,8 @@ class TestGroupOverlay:
         assert [len(ax.get_lines()) for ax in axes] == (
             [7] if overlay else [4, 3, 0]
         )
-        assert (
-            axes[-1].get_xlabel() == "time (s)"
-        )  # even if that panel is blank
+        # the bottom panel is blank, but still labelled
+        assert axes[-1].get_xlabel() == "time (s)"
 
     def test_draws_events_once(self, group):
         widget = FluorescenceWidget(

@@ -650,19 +650,13 @@ def _has_samples(
     time_range: Sequence[float], recording: BaseRecording, segment_index: int
 ) -> bool:
     """Return whether ``time_range``, clipped as drawn, selects any frame."""
-    time_range = _clip(time_range, recording, segment_index)
-    num_samples = recording.get_num_samples(segment_index=segment_index)
-    start, end = (
-        int(
-            np.clip(
-                recording.time_to_sample_index(t, segment_index),
-                0,
-                num_samples,
-            )
-        )
-        for t in time_range
-    )
-    return start < end
+    clipped = _clip(time_range, recording, segment_index)
+    frames = [
+        recording.time_to_sample_index(t, segment_index) for t in clipped
+    ]
+    n_frames = recording.get_num_samples(segment_index=segment_index)
+    start, end = np.clip(frames, 0, n_frames)
+    return bool(start < end)
 
 
 def _center(traces: np.ndarray) -> np.ndarray:
