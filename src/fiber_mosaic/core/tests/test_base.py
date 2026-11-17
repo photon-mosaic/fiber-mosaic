@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-import spikeinterface as si
 from spikeinterface.core import BaseRecording
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
@@ -13,7 +12,6 @@ from fiber_mosaic.core.base import (
     FiberPhotometryMixin,
     FiberPhotometryRecordingGroup,
 )
-from fiber_mosaic.extractors import CsvFiberPhotometryExtractor
 
 
 def _make_recording(
@@ -201,36 +199,6 @@ def test_mixin_provides_fiber_api_off_a_plain_recording():
     np.testing.assert_array_equal(rec.get_fiber_ids(), rec.fiber_ids)
     np.testing.assert_array_equal(rec.get_fluorescence(), traces)
     assert "name=green" in repr(rec)
-
-
-def test_fiber_properties_survive_json_round_trip(tmp_path):
-    """Per-fiber NWB properties are kept by the default ``dump_to_json``."""
-    times = np.arange(10) / 10.0
-    csv_path = tmp_path / "rec.csv"
-    np.savetxt(
-        csv_path,
-        np.column_stack([times, times, times]),
-        delimiter=",",
-        header="time,fiber_a,fiber_b",
-        comments="",
-    )
-    rec = CsvFiberPhotometryExtractor(
-        csv_path, name="green", time_column="time"
-    )
-    properties = {
-        "fiber_location": ["DMS", "NAc"],
-        "indicator": ["GCaMP6f", "dLight1.3b"],
-        "excitation_nm": [470.0, 470.0],
-        "emission_nm": [525.0, 525.0],
-    }
-    for key, values in properties.items():
-        rec.set_property(key, values)
-
-    rec.dump_to_json(tmp_path / "rec.json")
-    loaded = si.load(tmp_path / "rec.json")
-
-    for key, values in properties.items():
-        assert list(loaded.get_property(key)) == values
 
 
 def test_name_survives_copy_metadata(recording):

@@ -150,18 +150,11 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
     - ``indicator``: indicator label, e.g. ``["GCaMP6f", "dLight1.3b"]``.
     - ``excitation_nm`` and ``emission_nm``: wavelengths in nanometres.
 
-    All of them survive SpikeInterface processing steps and the
-    ``dump_to_json`` round trip.
+    All of them survive SpikeInterface processing steps. A JSON file keeps
+    them only when written with ``dump_to_json(..., include_properties=True)``
+    (SpikeInterface >= 0.106); readers that take them from the file restore
+    them when the JSON is loaded.
     """
-
-    # SpikeInterface's default ``dump_to_json`` keeps only these properties.
-    _main_properties = [
-        *BaseRecording._main_properties,
-        "fiber_location",
-        "indicator",
-        "excitation_nm",
-        "emission_nm",
-    ]
 
     def __init__(
         self,
