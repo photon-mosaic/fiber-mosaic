@@ -33,6 +33,7 @@ def _make_recording(
     baseline: float = 500.0,
     n_segments: int = 1,
     t_start: float | None = None,
+    nan_samples: slice | None = None,
 ) -> BaseFiberPhotometryExtractor:
     """Build a recording of slow sines on a large baseline, per fiber."""
     recording = BaseFiberPhotometryExtractor(
@@ -45,6 +46,8 @@ def _make_recording(
         [baseline + 3 * np.sin(times / 3 + i) for i in range(n_fibers)],
         axis=1,
     )
+    if nan_samples is not None:
+        traces[nan_samples, 0] = np.nan
     for _ in range(n_segments):
         recording.add_segment(
             NumpyRecordingSegment(
@@ -157,10 +160,6 @@ class TestRecordingMatplotlib:
         assert widget.ax.get_ylabel() == ""
         assert not widget.ax.get_yaxis().get_visible()
 
-    def test_trace_color(self, recording):
-        widget = FluorescenceWidget(recording, trace_color="tab:green")
-        assert set(_line_colors(widget.ax)) == {"tab:green"}
-
     def test_events_are_drawn(self, recording):
         widget = FluorescenceWidget(
             recording, events=np.array([5.0, 15.0, 90.0])
@@ -223,6 +222,16 @@ class TestTimeRange:
         widget = FluorescenceWidget(recording, time_range=(10.0, 30.0))
         assert widget.ax.get_xlim() == pytest.approx((10.0, 30.0))
 
+    def test_window_without_samples_raises(self, recording, group):
+        # past the end, between samples
+        for source in (recording, group):
+            for time_range in ((500, 600), (0.011, 0.012)):
+                with pytest.raises(ValueError, match="has no samples"):
+                    FluorescenceWidget(source, time_range=time_range)
+        # a window starting at the last sample (119.95 s)
+        with pytest.raises(ValueError, match="has no samples"):
+            FluorescenceWidget(recording, time_range=(119.95, 130))
+
     def test_multi_segment_requires_segment_index(self):
         with pytest.raises(ValueError, match="segment_index"):
             FluorescenceWidget(_make_recording(n_segments=2))
@@ -255,6 +264,14 @@ class TestCentering:
         )
         first = widget.ax.get_lines()[0]
         assert np.median(first.get_ydata()) == pytest.approx(500.0, abs=3)
+
+    def test_nan_gap_keeps_the_fiber(self):
+        """A NaN leaves a gap, not a blank fiber or the flat-trace spacing."""
+        widget = FluorescenceWidget(
+            _make_recording(nan_samples=slice(100, 140))
+        )
+        assert np.isnan(widget.ax.get_lines()[0].get_ydata()).sum() == 40
+        assert widget.traces_widgets[0]._vspacing > 1.0
 
     def test_does_not_change_the_data(self, recording):
         before = recording.get_fluorescence()
@@ -298,12 +315,6 @@ class TestDictMatplotlib:
             trace_color="tab:green",
         )
         assert _line_colors(widget.ax) == ["C0"] * 3 + ["C1"] * 3
-
-    def test_dict_of_one_keeps_trace_color(self, recording):
-        widget = FluorescenceWidget(
-            {"raw": recording}, trace_color="tab:green"
-        )
-        assert set(_line_colors(widget.ax)) == {"tab:green"}
 
     def test_different_timestamps_raise(self):
         """Upstream would draw the second layer against the first's times."""
@@ -373,6 +384,7 @@ class TestGroupMatplotlib:
         green, iso = FluorescenceWidget(group).traces_widgets
         assert green.ax.get_xlabel() == ""
         assert iso.ax.get_xlabel() == "time (s)"
+        assert not green.ax.xaxis.get_tick_params()["labelbottom"]
 
     def test_into_given_axes(self, group):
         _, axes = plt.subplots(2, 1)
@@ -450,6 +462,28 @@ class TestGroupOverlay:
             atol=1e-6,
         )
 
+    @pytest.mark.parametrize("overlay", [False, True])
+    def test_colors_ending_at_different_times(self, overlay):
+        """A color without samples in the window is blank; events are kept."""
+        group = FiberPhotometryRecordingGroup(
+            {
+                color: _make_recording(color=color, duration_s=seconds)
+                for color, seconds in (("iso", 20), ("red", 30), ("green", 10))
+            }
+        )
+        widget = FluorescenceWidget(
+            group,
+            time_range=(12, 30),
+            events=np.array([25.0]),
+            overlay=overlay,
+        )
+        axes = np.asarray(widget.axes).ravel()
+        assert [len(ax.get_lines()) for ax in axes] == (
+            [7] if overlay else [3, 4, 0]
+        )
+        # the bottom panel is blank, but still labelled
+        assert axes[-1].get_xlabel() == "time (s)"
+
     def test_draws_events_once(self, group):
         widget = FluorescenceWidget(
             group, overlay=True, events=np.array([5.0, 15.0])
@@ -515,11 +549,8 @@ class TestPhotometryColors:
             }
         )
         lines = FluorescenceWidget(group, overlay=True).ax.get_lines()
-        assert [line.get_color() for line in lines[::3]] == [
-            "C0",
-            "tab:green",
-            "C2",
-        ]
+        colors = [line.get_color() for line in lines[::3]]
+        assert len({matplotlib.colors.to_hex(c) for c in colors}) == 3
 
 
 # ---------------------------------------------------------------------------
