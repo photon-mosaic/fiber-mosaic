@@ -178,7 +178,8 @@ class FluorescenceWidget(BaseWidget):
         The fibers to plot. If None, plots all fibers.
     time_range : tuple of float, optional
         ``(start, end)`` in seconds. If None, plots the first 60 s of the
-        segment, or the whole segment if it is shorter.
+        segment, or the whole segment if it is shorter. A color with no
+        samples in the window is left blank (omitted with ``ipywidgets``).
     overlay : bool, default: False
         For a group, draw every color on one axis instead of one subplot
         per color. Needs the matplotlib backend.
@@ -231,8 +232,8 @@ class FluorescenceWidget(BaseWidget):
     ValueError
         If a dict's recordings do not share fibers and timestamps, if
         ``overlay`` is set for anything but a group, if a group is
-        overlaid with the ipywidgets backend, or if ``axes`` does not hold
-        one axis per group color.
+        overlaid with the ipywidgets backend, if ``axes`` does not hold
+        one axis per group color, or if ``time_range`` selects no samples.
 
     Examples
     --------
@@ -647,12 +648,17 @@ def _clip(
 def _has_samples(
     time_range: Sequence[float], recording: BaseRecording, segment_index: int
 ) -> bool:
-    """Return whether ``recording`` has samples inside ``time_range``."""
-    start = max(
-        time_range[0], recording.get_start_time(segment_index=segment_index)
-    )
-    end = min(
-        time_range[1], recording.get_end_time(segment_index=segment_index)
+    """Return whether ``time_range`` selects any frame of ``recording``."""
+    num_samples = recording.get_num_samples(segment_index=segment_index)
+    start, end = (
+        int(
+            np.clip(
+                recording.time_to_sample_index(t, segment_index),
+                0,
+                num_samples,
+            )
+        )
+        for t in time_range
     )
     return start < end
 

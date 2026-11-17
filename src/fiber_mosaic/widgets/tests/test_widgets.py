@@ -224,8 +224,12 @@ class TestTimeRange:
 
     def test_window_without_samples_raises(self, recording, group):
         for source in (recording, group):
-            with pytest.raises(ValueError, match="has no samples"):
-                FluorescenceWidget(source, time_range=(500, 600))
+            for time_range in (
+                (500, 600),
+                (0.011, 0.012),
+            ):  # past the end, between samples
+                with pytest.raises(ValueError, match="has no samples"):
+                    FluorescenceWidget(source, time_range=time_range)
 
     def test_multi_segment_requires_segment_index(self):
         with pytest.raises(ValueError, match="segment_index"):
