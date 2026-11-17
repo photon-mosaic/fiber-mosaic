@@ -344,8 +344,8 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     stream_name : str, optional
         Name of the stream to read. If None and only one stream exists,
         it will be used automatically.
-    color : str
-        Color/wavelength identifier (e.g. ``'470nm'``, ``'415nm'``).
+    name : str
+        Free-text label for this recording (e.g. ``'470nm'``, ``'415nm'``).
         Must be provided explicitly; Doric stream names do not encode
         illumination color.
 
@@ -361,7 +361,7 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     >>> recording = DoricFiberPhotometryExtractor(
     ...     "/path/to/data.doric",
     ...     stream_name="AIn-1",
-    ...     color="green"
+    ...     name="green"
     ... )
     """
 
@@ -369,7 +369,7 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         self,
         file_path: str | Path,
         stream_name: str | None = None,
-        color: str | None = None,
+        name: str | None = None,
     ):
         file_path = _resolve_doric_path(Path(file_path))
         is_doric_file = file_path.suffix == ".doric"
@@ -403,9 +403,9 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         # Create fiber IDs
         fiber_ids = [stream_name]
 
-        if color is None:
+        if name is None:
             raise ValueError(
-                "color must be provided explicitly (e.g. color='470nm'). "
+                "name must be provided explicitly (e.g. name='470nm'). "
                 "Doric stream names encode demodulation type, "
                 "not illumination color."
             )
@@ -414,7 +414,7 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         super().__init__(
             sampling_frequency=sampling_rate,
             fiber_ids=fiber_ids,
-            color=color,
+            name=name,
             dtype=data.dtype,
         )
 
@@ -424,7 +424,7 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         self._kwargs = {
             "file_path": str(file_path),
             "stream_name": stream_name,
-            "color": color,
+            "name": name,
         }
 
         logger.info(
@@ -465,7 +465,7 @@ class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 def read_doric_fiber_photometry(
     file_path: str | Path,
     stream_name: str | None = None,
-    color: str | None = None,
+    name: str | None = None,
 ) -> DoricFiberPhotometryExtractor:
     """
     Read fiber photometry data from a Doric file.
@@ -478,8 +478,8 @@ def read_doric_fiber_photometry(
         Path to the Doric file or folder.
     stream_name : str, optional
         Name of the stream to read.
-    color : str, optional
-        Color/wavelength identifier.
+    name : str, optional
+        Free-text label for this recording.
 
     Returns
     -------
@@ -489,5 +489,5 @@ def read_doric_fiber_photometry(
     return DoricFiberPhotometryExtractor(
         file_path=file_path,
         stream_name=stream_name,
-        color=color,
+        name=name,
     )

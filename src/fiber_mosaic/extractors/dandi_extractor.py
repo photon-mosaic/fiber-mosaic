@@ -15,6 +15,7 @@ from spikeinterface.core import BaseRecordingSegment
 from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
 from fiber_mosaic.extractors.nwb_extractor import (
     _discover_fiber_photometry_series,
+    _fiber_table_properties,
     _resolve_timing,
 )
 
@@ -277,8 +278,8 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         A DANDI URI of the form ``dandi://DANDISET_ID/asset/path.nwb``.
     series_name : str, optional
         Name of the FiberPhotometryResponseSeries to read.
-    color : str
-        Color/wavelength identifier (e.g. ``"green"``, ``"415nm"``).
+    name : str
+        Free-text label for this recording (e.g. ``"green"``, ``"415nm"``).
         Must be provided explicitly; NWB series names encode the
         experimental signal, not illumination color.
 
@@ -293,7 +294,7 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     >>> recording = DandiFiberPhotometryExtractor(
     ...     "dandi://000971/sub-112/session.nwb",
     ...     series_name="GCaMP_signal",
-    ...     color="green"
+    ...     name="green"
     ... )
     """
 
@@ -301,7 +302,7 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         self,
         dandi_uri: str,
         series_name: str | None = None,
-        color: str | None = None,
+        name: str | None = None,
     ):
         _check_dandi_dependencies()
 
@@ -340,6 +341,7 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
                 )
 
             series = series_dict[series_name]
+            properties = _fiber_table_properties(series)
 
             # Shape and dtype are HDF5 metadata — no data loaded here
             data_shape = series.data.shape
@@ -358,9 +360,9 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         finally:
             io.close()
 
-        if color is None:
+        if name is None:
             raise ValueError(
-                "color must be provided explicitly (e.g. color='green'). "
+                "name must be provided explicitly (e.g. name='green'). "
                 "NWB series names encode the experimental signal, "
                 "not illumination color."
             )
@@ -370,7 +372,7 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         super().__init__(
             sampling_frequency=sampling_rate,
             fiber_ids=fiber_ids,
-            color=color,
+            name=name,
             dtype=dtype,
         )
 
@@ -385,11 +387,13 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         )
         self.add_segment(segment)
         self.set_times(timestamps, with_warning=False)
+        for key, values in properties.items():
+            self.set_property(key, values)
 
         self._kwargs = {
             "dandi_uri": dandi_uri,
             "series_name": series_name,
-            "color": color,
+            "name": name,
         }
 
         logger.info(
@@ -439,7 +443,7 @@ class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 def read_dandi_fiber_photometry(
     dandi_uri: str,
     series_name: str | None = None,
-    color: str | None = None,
+    name: str | None = None,
 ) -> DandiFiberPhotometryExtractor:
     """
     Read fiber photometry data from the DANDI Archive.
@@ -452,8 +456,8 @@ def read_dandi_fiber_photometry(
         A DANDI URI of the form ``dandi://DANDISET_ID/asset/path.nwb``.
     series_name : str, optional
         Name of the FiberPhotometryResponseSeries to read.
-    color : str
-        Color/wavelength identifier.
+    name : str
+        Free-text label for this recording.
 
     Returns
     -------
@@ -465,11 +469,11 @@ def read_dandi_fiber_photometry(
     >>> rec = read_dandi_fiber_photometry(
     ...     "dandi://000971/sub-112/session.nwb",
     ...     series_name="GCaMP_signal",
-    ...     color="green"
+    ...     name="green"
     ... )
     """
     return DandiFiberPhotometryExtractor(
         dandi_uri=dandi_uri,
         series_name=series_name,
-        color=color,
+        name=name,
     )

@@ -17,7 +17,7 @@ from fiber_mosaic.core.base import (
 
 def _make_recording(
     fiber_ids=("f0", "f1", "f2"),
-    color="green",
+    name="green",
     n_samples=10,
     sampling_frequency=100.0,
     dtype="float32",
@@ -26,7 +26,7 @@ def _make_recording(
     rec = BaseFiberPhotometryExtractor(
         sampling_frequency=sampling_frequency,
         fiber_ids=list(fiber_ids),
-        color=color,
+        name=name,
         dtype=dtype,
     )
     n_fibers = len(fiber_ids)
@@ -52,8 +52,8 @@ def recording():
 @pytest.fixture
 def group():
     """green+red recording group sharing the default fiber set."""
-    green, _ = _make_recording(color="green")
-    red, _ = _make_recording(color="red")
+    green, _ = _make_recording(name="green")
+    red, _ = _make_recording(name="red")
     grp = FiberPhotometryRecordingGroup({"green": green, "red": red})
     return grp, green, red
 
@@ -62,18 +62,18 @@ def group():
 
 
 def test_construction_sets_color_and_fibers(recording):
-    """Color, fiber count, and fiber_ids are wired through __init__."""
+    """Name, fiber count, and fiber_ids are wired through __init__."""
     rec, _ = recording
-    assert rec.color == "green"
+    assert rec.name == "green"
     assert rec.get_num_fibers() == 3
     np.testing.assert_array_equal(rec.fiber_ids, np.array(["f0", "f1", "f2"]))
     np.testing.assert_array_equal(rec.get_fiber_ids(), rec.fiber_ids)
 
 
 def test_kwargs_round_trip_metadata(recording):
-    """``_kwargs`` carries color and fiber_ids for serialization."""
+    """``_kwargs`` carries name and fiber_ids for serialization."""
     rec, _ = recording
-    assert rec._kwargs["color"] == "green"
+    assert rec._kwargs["name"] == "green"
     assert rec._kwargs["fiber_ids"] == ["f0", "f1", "f2"]
 
 
@@ -107,11 +107,11 @@ def test_get_fluorescence_matches_get_traces(recording):
     np.testing.assert_array_equal(rec.get_fluorescence(), rec.get_traces())
 
 
-def test_repr_includes_color_and_fiber_count(recording):
-    """``repr`` surfaces color and fiber count."""
+def test_repr_includes_name_and_fiber_count(recording):
+    """``repr`` surfaces name and fiber count."""
     rec, _ = recording
     r = repr(rec)
-    assert "color=green" in r
+    assert "name=green" in r
     assert "3 fiber" in r
 
 
@@ -120,7 +120,7 @@ def test_multi_segment():
     rec = BaseFiberPhotometryExtractor(
         sampling_frequency=100.0,
         fiber_ids=["f0", "f1"],
-        color="red",
+        name="red",
         dtype="float32",
     )
     rec.add_segment(
@@ -150,18 +150,18 @@ class _PlainFiberRecording(FiberPhotometryMixin, BaseRecording):
 
     Mirrors what a SpikeInterface preprocessor looks like from the mixin's
     point of view: a plain ``BaseRecording`` that never runs
-    ``BaseFiberPhotometryExtractor.__init__``, so it has no ``color``
-    attribute and none of the extractor's source-side machinery.
+    ``BaseFiberPhotometryExtractor.__init__``, so it sets its own name and
+    has none of the extractor's source-side machinery.
     """
 
-    def __init__(self, sampling_frequency, fiber_ids, color, dtype):
+    def __init__(self, sampling_frequency, fiber_ids, name, dtype):
         BaseRecording.__init__(
             self,
             sampling_frequency=sampling_frequency,
             channel_ids=list(fiber_ids),
             dtype=dtype,
         )
-        self.annotate(color=color)
+        self.name = name
 
 
 def _make_plain_recording(n_samples=10, fiber_ids=("f0", "f1", "f2")):
@@ -170,7 +170,7 @@ def _make_plain_recording(n_samples=10, fiber_ids=("f0", "f1", "f2")):
     rec = _PlainFiberRecording(
         sampling_frequency=sampling_frequency,
         fiber_ids=fiber_ids,
-        color="green",
+        name="green",
         dtype="float32",
     )
     traces = np.arange(n_samples * len(fiber_ids), dtype="float32").reshape(
@@ -194,34 +194,34 @@ def test_mixin_provides_fiber_api_off_a_plain_recording():
     """
     rec, traces = _make_plain_recording()
 
-    assert rec.color == "green"
+    assert rec.name == "green"
     assert rec.get_num_fibers() == 3
     np.testing.assert_array_equal(rec.fiber_ids, np.array(["f0", "f1", "f2"]))
     np.testing.assert_array_equal(rec.get_fiber_ids(), rec.fiber_ids)
     np.testing.assert_array_equal(rec.get_fluorescence(), traces)
-    assert "color=green" in repr(rec)
+    assert "name=green" in repr(rec)
 
 
-def test_color_survives_copy_metadata(recording):
-    """Color rides on an annotation, so copy_metadata carries it.
+def test_name_survives_copy_metadata(recording):
+    """The name rides on an annotation, so copy_metadata carries it.
 
     SpikeInterface's BasePreprocessor propagates metadata with
     ``copy_metadata(only_main=False)``, which copies annotations but not
-    attributes -- so the color has to be an annotation to reach a
+    attributes -- so the name has to be an annotation to reach a
     preprocessor at all.
     """
     rec, _ = recording
     other = BaseFiberPhotometryExtractor(
         sampling_frequency=rec.get_sampling_frequency(),
         fiber_ids=list(rec.get_channel_ids()),
-        color="placeholder",
+        name="placeholder",
         dtype=rec.get_dtype(),
     )
 
     rec.copy_metadata(other, only_main=False)
 
-    assert other.get_annotation("color") == "green"
-    assert other.color == "green"
+    assert other.get_annotation("name") == "green"
+    assert other.name == "green"
 
 
 # ---------------- recording_from_traces ----------------
@@ -230,12 +230,10 @@ def test_color_survives_copy_metadata(recording):
 def test_recording_from_traces_without_timestamps():
     """No ``timestamps`` -> nominal times, from ``sampling_frequency``."""
     traces = np.ones((10, 2), dtype="float32")
-    rec = recording_from_traces(
-        traces, color="green", sampling_frequency=100.0
-    )
+    rec = recording_from_traces(traces, name="green", sampling_frequency=100.0)
 
     assert isinstance(rec, FiberPhotometryMixin)
-    assert rec.color == "green"
+    assert rec.name == "green"
     assert not rec.has_time_vector()
 
 
@@ -252,7 +250,7 @@ def test_recording_from_traces_with_1d_timestamps(as_type):
 
     rec = recording_from_traces(
         traces,
-        color="green",
+        name="green",
         sampling_frequency=100.0,
         timestamps=as_type(times),
     )
@@ -267,7 +265,7 @@ def test_recording_from_traces_with_per_segment_timestamps():
     times = [np.linspace(1.0, 1.04, 5), np.linspace(2.0, 2.03, 4)]
 
     rec = recording_from_traces(
-        traces, color="red", sampling_frequency=100.0, timestamps=times
+        traces, name="red", sampling_frequency=100.0, timestamps=times
     )
 
     for segment_index, segment_times in enumerate(times):
@@ -281,7 +279,7 @@ def test_recording_from_traces_with_sequence_traces(container):
     """A sequence of per-segment arrays works as a list or a tuple."""
     traces = container([np.ones((5, 2)), np.zeros((4, 2))])
 
-    rec = recording_from_traces(traces, color="red", sampling_frequency=100.0)
+    rec = recording_from_traces(traces, name="red", sampling_frequency=100.0)
 
     assert rec.get_num_segments() == 2
     assert rec.get_num_samples(1) == 4
@@ -295,7 +293,7 @@ def test_recording_from_traces_timestamps_segment_count_mismatch():
 
     with pytest.raises(ValueError, match="one array per segment"):
         recording_from_traces(
-            traces, color="red", sampling_frequency=100.0, timestamps=times
+            traces, name="red", sampling_frequency=100.0, timestamps=times
         )
 
 
@@ -309,7 +307,7 @@ def test_empty_recordings_raises():
 
 
 def test_mismatched_fiber_sets_raises():
-    """Colors with differing fiber IDs are rejected at construction."""
+    """Recordings with differing fiber IDs are rejected at construction."""
     g, _ = _make_recording(fiber_ids=["a", "b"])
     r, _ = _make_recording(fiber_ids=["a", "c"])
     with pytest.raises(ValueError):
@@ -317,9 +315,9 @@ def test_mismatched_fiber_sets_raises():
 
 
 def test_group_colors_and_fiber_ids(group):
-    """``colors``, ``fiber_ids``, ``get_num_fibers`` reflect inputs."""
+    """``names``, ``fiber_ids``, ``get_num_fibers`` reflect inputs."""
     grp, *_ = group
-    assert grp.colors == ["green", "red"]
+    assert grp.names == ["green", "red"]
     np.testing.assert_array_equal(grp.fiber_ids, np.array(["f0", "f1", "f2"]))
     assert grp.get_num_fibers() == 3
 
@@ -344,7 +342,7 @@ def test_group_dict_like_methods(group):
 
 
 def test_group_repr(group):
-    """``repr`` lists the fiber count and each per-color recording."""
+    """``repr`` lists the fiber count and each named recording."""
     grp, *_ = group
     r = repr(grp)
     assert "3 fiber(s)" in r

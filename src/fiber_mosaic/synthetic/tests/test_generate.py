@@ -59,18 +59,18 @@ def test_simulate_group_and_recording_from_traces():
     )
 
     assert isinstance(group, FiberPhotometryRecordingGroup)
-    assert group.colors == ["green", "iso"]
+    assert group.names == ["green", "iso"]
     assert group.get_num_fibers() == _NUM_FIBERS
     assert calcium.shape == (_NUM_SAMPLES, _NUM_FIBERS)
     green = group["green"]
     assert isinstance(green, FiberPhotometryMixin)
-    assert green.color == "green"
+    assert green.name == "green"
     assert green.get_num_samples() == _NUM_SAMPLES
 
     # a sequence of arrays becomes one segment each, with explicit fiber ids
     multi = recording_from_traces(
         [np.ones((10, 2)), np.zeros((4, 2))],
-        color="red",
+        name="red",
         sampling_frequency=30.0,
         fiber_ids=["a", "b"],
     )
@@ -90,3 +90,17 @@ def test_simulate_group_uses_explicit_sampling_frequency():
 
     assert group["green"].get_sampling_frequency() == rate
     assert group["iso"].get_sampling_frequency() == rate
+
+
+def test_simulate_group_custom_names():
+    """Custom names key the group and label each recording."""
+    group, _ = simulate_group(
+        signal_name="gcamp",
+        reference_name="isos",
+        num_samples=_NUM_SAMPLES,
+        num_fibers=_NUM_FIBERS,
+    )
+
+    assert group.names == ["gcamp", "isos"]
+    assert group["gcamp"].name == "gcamp"
+    assert group["isos"].name == "isos"

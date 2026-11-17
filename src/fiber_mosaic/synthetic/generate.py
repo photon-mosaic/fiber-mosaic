@@ -185,8 +185,8 @@ def simulate_bands(
 
 
 def simulate_group(
-    signal_color: str = "green",
-    reference_color: str = "iso",
+    signal_name: str = "green",
+    reference_name: str = "iso",
     sampling_frequency: float = DEFAULT_SAMPLING_FREQUENCY,
     **kwargs,
 ) -> tuple[FiberPhotometryRecordingGroup, np.ndarray]:
@@ -197,9 +197,9 @@ def simulate_group(
 
     Parameters
     ----------
-    signal_color : str, default: "green"
+    signal_name : str, default: "green"
         Band name for the calcium-dependent recording.
-    reference_color : str, default: "iso"
+    reference_name : str, default: "iso"
         Band name for the isosbestic reference recording.
     sampling_frequency : float, default: DEFAULT_SAMPLING_FREQUENCY
         Acquisition rate in Hz. Passed to both `simulate_bands` and
@@ -220,11 +220,11 @@ def simulate_group(
     )
     group = FiberPhotometryRecordingGroup(
         {
-            signal_color: recording_from_traces(
-                signal, signal_color, sampling_frequency
+            signal_name: recording_from_traces(
+                signal, signal_name, sampling_frequency
             ),
-            reference_color: recording_from_traces(
-                reference, reference_color, sampling_frequency
+            reference_name: recording_from_traces(
+                reference, reference_name, sampling_frequency
             ),
         }
     )
