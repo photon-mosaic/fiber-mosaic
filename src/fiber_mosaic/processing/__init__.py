@@ -16,7 +16,7 @@ FiberPhotometryRecordingGroup, and returns the matching container:
 
     >>> from fiber_mosaic.processing import bandpass_filter
     >>> filtered = bandpass_filter(group, freq_min=0.1, freq_max=5.0)
-    >>> filtered.colors
+    >>> filtered.names
     ['green', 'iso']
 """
 

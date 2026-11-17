@@ -18,7 +18,7 @@ class IsosbesticCorrectionSegment(BasePreprocessorSegment):
     # TODO implement
     #  - the robust regressions (different loss functions, MAE, huber) + IRLS
     #  - choice of correction method: subtract, divide, substract-divide
-    #  - output color naming? should we append _isosbestic-corrected
+    #  - output naming? should we append _isosbestic-corrected
 
     def __init__(
         self,
@@ -85,7 +85,7 @@ def isosbestic_correction(
     Correct a signal recording with its isosbestic reference.
 
     Takes one signal and one reference, never a group: a group does not
-    define which color corrects which.
+    define which recording corrects which.
 
     Parameters
     ----------

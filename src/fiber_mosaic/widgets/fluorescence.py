@@ -416,7 +416,7 @@ def _layer_panels(
         # black; one color for every layer would hide which is which.
         draw["trace_color"] = None
     elif draw["trace_color"] is None:
-        draw["trace_color"] = _display_color(rec0.get_annotation("color"))
+        draw["trace_color"] = _display_color(rec0.get_annotation("name"))
     return segment_index, time_range, [dict(title=None, draws=[draw])]
 
 
@@ -561,7 +561,7 @@ def _traces_kwargs(dp, draw: dict) -> dict:
 def _as_layers(recording) -> dict[str, BaseRecording]:
     """Return ``recording`` as TracesWidget layers, named for the legend."""
     if isinstance(recording, BaseRecording):
-        return {recording.get_annotation("color") or "signal": recording}
+        return {recording.get_annotation("name") or "signal": recording}
     if isinstance(recording, dict):
         if not recording:
             raise ValueError("recordings dict cannot be empty")

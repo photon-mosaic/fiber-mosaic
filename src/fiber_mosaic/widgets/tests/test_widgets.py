@@ -27,7 +27,7 @@ FS = 20.0
 
 
 def _make_recording(
-    color: str = "green",
+    name: str = "green",
     n_fibers: int = 3,
     duration_s: float = 120.0,
     baseline: float = 500.0,
@@ -39,7 +39,7 @@ def _make_recording(
     recording = BaseFiberPhotometryExtractor(
         sampling_frequency=FS,
         fiber_ids=[f"F{index}" for index in range(n_fibers)],
-        color=color,
+        name=name,
     )
     times = np.arange(int(duration_s * FS)) / FS
     traces = np.stack(
@@ -61,8 +61,8 @@ def _make_group(**kwargs) -> FiberPhotometryRecordingGroup:
     """Green and iso, interleaved: iso samples half a frame later."""
     return FiberPhotometryRecordingGroup(
         {
-            "green": _make_recording(color="green", **kwargs),
-            "iso": _make_recording(color="iso", t_start=0.025, **kwargs),
+            "green": _make_recording(name="green", **kwargs),
+            "iso": _make_recording(name="iso", t_start=0.025, **kwargs),
         }
     )
 
@@ -138,11 +138,11 @@ class TestRecordingMatplotlib:
         assert isinstance(widget.traces_widgets[0], FiberTracesWidget)
 
     def test_legend_names_the_color(self):
-        widget = FluorescenceWidget(_make_recording(color="iso"))
+        widget = FluorescenceWidget(_make_recording(name="iso"))
         assert _legend_texts(widget.ax) == ["iso"]
 
     def test_legend_falls_back_when_no_color(self):
-        """A recording without a color annotation is labelled 'signal'."""
+        """A recording without a name annotation is labelled 'signal'."""
         widget = FluorescenceWidget(NumpyRecording(np.zeros((100, 2)), FS))
         assert _legend_texts(widget.ax) == ["signal"]
 
@@ -178,7 +178,7 @@ class TestRecordingMatplotlib:
 
     def test_processed_recording(self):
         """A processing step's output plots like an extractor's, color kept."""
-        widget = FluorescenceWidget(zscore(_make_recording(color="green")))
+        widget = FluorescenceWidget(zscore(_make_recording(name="green")))
         assert _legend_texts(widget.ax) == ["green"]
         assert len(widget.ax.get_lines()) == 3
 
@@ -318,8 +318,8 @@ class TestDictMatplotlib:
 
     def test_different_timestamps_raise(self):
         """Upstream would draw the second layer against the first's times."""
-        green = _make_recording(color="green")
-        iso = _make_recording(color="iso", t_start=0.025)
+        green = _make_recording(name="green")
+        iso = _make_recording(name="iso", t_start=0.025)
         with pytest.raises(ValueError, match="FiberPhotometryRecordingGroup"):
             FluorescenceWidget({"green": green, "iso": iso})
 
@@ -442,8 +442,8 @@ class TestGroupOverlay:
         """Each fiber's traces share a row, even with different amplitudes."""
         group = FiberPhotometryRecordingGroup(
             {
-                "green": _make_recording(color="green"),
-                "iso": zscore(_make_recording(color="iso", t_start=0.025)),
+                "green": _make_recording(name="green"),
+                "iso": zscore(_make_recording(name="iso", t_start=0.025)),
             }
         )
         lines = FluorescenceWidget(group, overlay=True).ax.get_lines()
@@ -467,7 +467,7 @@ class TestGroupOverlay:
         """A color without samples in the window is blank; events are kept."""
         group = FiberPhotometryRecordingGroup(
             {
-                color: _make_recording(color=color, duration_s=seconds)
+                color: _make_recording(name=color, duration_s=seconds)
                 for color, seconds in (("iso", 20), ("red", 30), ("green", 10))
             }
         )
@@ -513,16 +513,16 @@ class TestPhotometryColors:
         ],
     )
     def test_recording_drawn_in_its_color(self, color, expected):
-        widget = FluorescenceWidget(_make_recording(color=color))
+        widget = FluorescenceWidget(_make_recording(name=color))
         assert set(_line_colors(widget.ax)) == {expected}
 
     def test_unknown_color_keeps_upstream_default(self):
-        default = FluorescenceWidget(_make_recording(color="signal_465"))
+        default = FluorescenceWidget(_make_recording(name="signal_465"))
         assert set(_line_colors(default.ax)) == {"k"}
 
     def test_trace_color_overrides(self):
         widget = FluorescenceWidget(
-            _make_recording(color="iso"), trace_color="black"
+            _make_recording(name="iso"), trace_color="black"
         )
         assert set(_line_colors(widget.ax)) == {"black"}
 
@@ -544,7 +544,7 @@ class TestPhotometryColors:
         """Unknown or repeated colors still get one distinct color each."""
         group = FiberPhotometryRecordingGroup(
             {
-                name: _make_recording(color=name)
+                name: _make_recording(name=name)
                 for name in ("signal_465", "green", "Green")
             }
         )

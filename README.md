@@ -42,7 +42,7 @@ first and installed LFS afterwards, `git lfs pull` fixes it in place.
 
 ## Examples
 
-A runnable walkthrough lives in [`examples/quickstart.ipynb`](examples/quickstart.ipynb): building per-color recordings, reading fluorescence with the fiber-native API, attaching timestamps with `set_times`, bundling colors into a `FiberPhotometryRecordingGroup`, discovering streams with `get_streams`, processing, and plotting raw or processed signals with `plot_fluorescence`.
+A runnable walkthrough lives in [`examples/quickstart.ipynb`](examples/quickstart.ipynb): building named recordings, reading fluorescence with the fiber-native API, attaching timestamps with `set_times`, bundling recordings into a `FiberPhotometryRecordingGroup`, discovering streams with `get_streams`, processing, and plotting raw or processed signals with `plot_fluorescence`.
 
 The notebook is committed **without cell outputs** to keep diffs small. To populate the outputs, install Jupyter, then run it:
 
