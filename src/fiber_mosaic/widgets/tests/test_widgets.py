@@ -242,6 +242,20 @@ class TestTimeRange:
         )
         assert widget.ax.get_xlim() == pytest.approx((0.0, 60.0))
 
+    def test_window_after_a_pause_in_acquisition(self):
+        """Upstream assumes even sampling; the window must follow the times."""
+        recording = _make_recording()
+        times = recording.get_times(segment_index=0)
+        recording.set_times(
+            np.where(times >= 100, times + 20, times),
+            segment_index=0,
+            with_warning=False,
+        )
+        widget = FluorescenceWidget(recording, time_range=(105, 125))
+        assert widget.ax.get_lines()[0].get_xdata().max() == pytest.approx(
+            124.95
+        )
+
 
 # ---------------------------------------------------------------------------
 # FluorescenceWidget – display centering
@@ -584,6 +598,28 @@ class TestIpywidgets:
         np.testing.assert_allclose(ax.get_yticks(), ticks_before)
         swing_after = np.ptp(ax.get_lines()[0].get_ydata())
         assert swing_after == pytest.approx(2 * swing_before)
+
+    def test_starts_on_the_requested_segment_and_scale(self, ipympl_backend):
+        """Upstream's controls start at segment 0 (maybe shorter), scale 1."""
+        recording = _make_recording(duration_s=5.0)
+        recording.add_segment(
+            NumpyRecordingSegment(
+                traces=_make_recording(duration_s=60.0).get_traces(),
+                sampling_frequency=FS,
+                t_start=None,
+            )
+        )
+        widget = FluorescenceWidget(
+            recording,
+            segment_index=1,
+            scale=2,
+            backend="ipywidgets",
+            display=False,
+        )
+        (traces_widget,) = widget.traces_widgets
+        line = traces_widget.ax.get_lines()[0]
+        assert line.get_xdata().max() > 5.0  # segment 1 is drawn
+        assert np.ptp(line.get_ydata()) == pytest.approx(12.0, rel=0.01)
 
     def test_dict_layer_keeps_its_color(self, ipympl_backend, recording):
         """Showing one layer alone must not recolor it as the first layer."""
