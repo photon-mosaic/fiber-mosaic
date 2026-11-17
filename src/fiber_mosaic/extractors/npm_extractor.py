@@ -281,8 +281,8 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     stream_name : str, optional
         Name of the stream to read (format: "ColumnName_ledN").
         If None and only one stream exists, it will be used automatically.
-    color : str
-        Color/wavelength identifier (e.g. ``"green"``, ``"415nm"``).
+    name : str
+        Free-text label for this recording (e.g. ``"green"``, ``"415nm"``).
     timestamp_unit : {"s", "ms"}, optional
         Unit of the timestamp column. If None (default), the unit is
         inferred from the inter-sample interval. Pass ``"ms"`` or ``"s"``
@@ -303,14 +303,14 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
     >>> recording = NpmFiberPhotometryExtractor(
     ...     "/path/to/npm.csv",
     ...     stream_name="Region0G_led2",
-    ...     color="green"
+    ...     name="green"
     ... )
 
     >>> # Read isosbestic/control channel (LED state 1 is typically 415nm)
     >>> iso_recording = NpmFiberPhotometryExtractor(
     ...     "/path/to/npm.csv",
     ...     stream_name="Region0G_led1",
-    ...     color="iso"
+    ...     name="iso"
     ... )
     """
 
@@ -318,7 +318,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         self,
         file_path: str | Path,
         stream_name: str | None = None,
-        color: str | None = None,
+        name: str | None = None,
         timestamp_unit: str | None = None,
         timestamp_column: str | None = None,
     ):
@@ -356,9 +356,9 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         # Create fiber IDs
         fiber_ids = [stream_name]
 
-        if color is None:
+        if name is None:
             raise ValueError(
-                "color must be provided explicitly (e.g. color='green'). "
+                "name must be provided explicitly (e.g. name='green'). "
                 "NPM stream names encode channel and LED state "
                 "(e.g. 'G0_led2'), not illumination color."
             )
@@ -367,7 +367,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         super().__init__(
             sampling_frequency=sampling_rate,
             fiber_ids=fiber_ids,
-            color=color,
+            name=name,
             dtype=data.dtype,
         )
 
@@ -377,7 +377,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
         self._kwargs = {
             "file_path": str(file_path),
             "stream_name": stream_name,
-            "color": color,
+            "name": name,
             "timestamp_unit": timestamp_unit,
             "timestamp_column": timestamp_column,
         }
@@ -414,7 +414,7 @@ class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
 def read_npm_fiber_photometry(
     file_path: str | Path,
     stream_name: str | None = None,
-    color: str | None = None,
+    name: str | None = None,
     timestamp_unit: str | None = None,
     timestamp_column: str | None = None,
 ) -> NpmFiberPhotometryExtractor:
@@ -429,8 +429,8 @@ def read_npm_fiber_photometry(
         Path to the NPM CSV file.
     stream_name : str, optional
         Name of the stream to read.
-    color : str, optional
-        Color/wavelength identifier.
+    name : str, optional
+        Free-text label for this recording.
     timestamp_unit : {"s", "ms"}, optional
         Unit of the timestamp column. If None, inferred automatically.
     timestamp_column : str, optional
@@ -444,7 +444,7 @@ def read_npm_fiber_photometry(
     return NpmFiberPhotometryExtractor(
         file_path=file_path,
         stream_name=stream_name,
-        color=color,
+        name=name,
         timestamp_unit=timestamp_unit,
         timestamp_column=timestamp_column,
     )
