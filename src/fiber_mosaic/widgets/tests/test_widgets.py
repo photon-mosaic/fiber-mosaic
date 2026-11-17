@@ -242,6 +242,22 @@ class TestTimeRange:
         )
         assert widget.ax.get_xlim() == pytest.approx((0.0, 60.0))
 
+    def test_window_after_a_pause_in_acquisition(self):
+        """Upstream assumes even sampling; the window must follow the times."""
+        recording = _make_recording()
+        times = recording.get_times(segment_index=0)
+        recording.set_times(
+            np.where(times >= 100, times + 20, times),
+            segment_index=0,
+            with_warning=False,
+        )
+        widget = FluorescenceWidget(
+            recording, time_range=(105, 125), events=np.array([122.0])
+        )
+        lines = widget.ax.get_lines()
+        assert lines[0].get_xdata().max() == pytest.approx(124.95)
+        assert len(lines) == 3 + 1  # three fibers and the event
+
 
 # ---------------------------------------------------------------------------
 # FluorescenceWidget – display centering
@@ -584,6 +600,36 @@ class TestIpywidgets:
         np.testing.assert_allclose(ax.get_yticks(), ticks_before)
         swing_after = np.ptp(ax.get_lines()[0].get_ydata())
         assert swing_after == pytest.approx(2 * swing_before)
+
+    def test_starts_on_the_requested_segment_and_scale(self, ipympl_backend):
+        """Upstream's controls start at segment 0, scale 1, window <= 30 s."""
+        recording = _make_recording(duration_s=5.0)  # shorter than the window
+        recording.add_segment(
+            NumpyRecordingSegment(
+                traces=_make_recording(duration_s=60.0).get_traces(),
+                sampling_frequency=FS,
+                t_start=None,
+            )
+        )
+        for segment in (0, 1):
+            recording.set_times(
+                recording.get_times(segment_index=segment),
+                segment_index=segment,
+                with_warning=False,
+            )
+        widget = FluorescenceWidget(
+            recording,
+            segment_index=1,
+            time_range=(10, 50),
+            scale=2,
+            backend="ipywidgets",
+            display=False,
+        )
+        (traces_widget,) = widget.traces_widgets
+        line = traces_widget.ax.get_lines()[0]
+        times = line.get_xdata()
+        assert (times[0], times[-1]) == pytest.approx((10, 49.95))
+        assert np.ptp(line.get_ydata()) == pytest.approx(12.0, rel=0.01)
 
     def test_dict_layer_keeps_its_color(self, ipympl_backend, recording):
         """Showing one layer alone must not recolor it as the first layer."""
