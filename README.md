@@ -19,9 +19,9 @@ ephys vocabulary to fiber-photometry vocabulary where the meaning differs.
 | --- | --- | --- |
 | **fiber** | One spatial recording site (an implanted optical fiber). Identified by `fiber_ids`. | channel (`channel_ids`) |
 | **fluorescence** | The measured signal, shape `(n_samples, n_fibers)`. Read with `get_fluorescence(fiber_ids=...)`. | traces (`get_traces`) |
-| **recording** | The data for **one illumination band** (e.g. green 470 nm, isosbestic 415 nm), across all fibers. One `BaseFiberPhotometryExtractor` per band. | `BaseRecording` |
+| **recording** | The data for **one illumination band** (e.g. green 470 nm, isosbestic 415 nm), across all fibers. One `BaseFiberPhotometryRecording` per band. | `BaseRecording` |
 | **name** | Free-text label of a recording (e.g. `"470nm"`, `"iso"`). Not a physical axis. | recording `name` |
-| **recording group** | A dict-like collection of `BaseFiberPhotometryExtractor` instances, one per band of an experiment (`name -> recording`). All members must share the same `fiber_ids` in the same order. Each band keeps its own timebase, so the group does not merge them into one trace matrix. | no equivalent |
+| **recording group** | A dict-like collection of `BaseFiberPhotometryRecording` instances, one per band of an experiment (`name -> recording`). All members must share the same `fiber_ids` in the same order. Each band keeps its own timebase, so the group does not merge them into one trace matrix. | no equivalent |
 | **segment** | A contiguous block of samples within a recording. Owns the raw arrays; the recording owns the metadata. | segment |
 | **stream** | A data stream available in a source file, discovered with `get_streams()` before loading. | stream |
 | **times** | One 1-D timestamp vector per segment, shared by every fiber of a band. Each band keeps its own timebase. Set with `set_times`, read with `get_times`. | `set_times` / `get_times` |
