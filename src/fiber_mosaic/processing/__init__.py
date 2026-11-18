@@ -74,3 +74,14 @@ processor_dict = {
     for pp_class, pp_function in _all_processer_dict.items()
 }
 __all__.append("processor_dict")
+
+# last: pipeline.py imports processor_dict from this module
+from fiber_mosaic.processing.pipeline import (  # noqa: E402
+    apply_processing_pipeline as apply_processing_pipeline,
+)
+from fiber_mosaic.processing.pipeline import ( # noqa: E402
+    available_processing_steps as available_processing_steps
+)
+
+__all__.append("apply_processing_pipeline")
+__all__.append("available_processing_steps")
