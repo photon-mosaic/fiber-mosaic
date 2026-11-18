@@ -5,15 +5,15 @@ from __future__ import annotations
 import numpy as np
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
-from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
+from fiber_mosaic.core.base import BaseFiberPhotometryRecording
 from fiber_mosaic.processing import isosbestic_correction
 
 
 def _make_recording(
     name: str, levels: list[float], n_segments: int = 2
-) -> BaseFiberPhotometryExtractor:
+) -> BaseFiberPhotometryRecording:
     """Build a recording holding a constant level per fiber."""
-    recording = BaseFiberPhotometryExtractor(
+    recording = BaseFiberPhotometryRecording(
         sampling_frequency=100.0,
         fiber_ids=[f"f{index}" for index in range(len(levels))],
         name=name,

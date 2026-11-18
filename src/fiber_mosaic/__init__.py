@@ -6,14 +6,14 @@ vocabulary and tools for working with fiber photometry recordings.
 
 Key concepts:
 - A "fiber" is analogous to a channel in electrophysiology
-- A recording (one BaseFiberPhotometryExtractor) is labelled by its name
+- A recording (one BaseFiberPhotometryRecording) is labelled by its name
 - A FiberPhotometryRecordingGroup bundles named recordings sharing fibers
 """
 
 __version__ = "0.1.0"
 
 from .core.base import (
-    BaseFiberPhotometryExtractor,
+    BaseFiberPhotometryRecording,
     FiberPhotometryMixin,
     FiberPhotometryRecordingGroup,
     recording_from_traces,
@@ -47,7 +47,7 @@ from .extractors import (
 
 __all__ = [
     # Core classes
-    "BaseFiberPhotometryExtractor",
+    "BaseFiberPhotometryRecording",
     "FiberPhotometryMixin",
     "FiberPhotometryRecordingGroup",
     "recording_from_traces",

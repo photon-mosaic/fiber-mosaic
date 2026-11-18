@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
+from fiber_mosaic.core.base import BaseFiberPhotometryRecording
 
 logger = logging.getLogger(__name__)
 
@@ -330,7 +330,7 @@ def _read_doric_file_data(
         return _read_doric_v6_data(f, stream_name)
 
 
-class DoricFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
+class DoricFiberPhotometryExtractor(BaseFiberPhotometryRecording):
     """
     Extractor for Doric Neuroscience fiber photometry files.
 

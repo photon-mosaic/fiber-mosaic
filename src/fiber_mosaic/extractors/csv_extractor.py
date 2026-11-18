@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
+from fiber_mosaic.core.base import BaseFiberPhotometryRecording
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ def _select_fiber_columns(
     return non_time
 
 
-class CsvFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
+class CsvFiberPhotometryExtractor(BaseFiberPhotometryRecording):
     """
     Extractor for CSV fiber photometry files.
 

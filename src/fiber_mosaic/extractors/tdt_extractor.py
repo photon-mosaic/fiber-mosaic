@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from numpy import float32, float64, int32, int64, uint16
 
-from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
+from fiber_mosaic.core.base import BaseFiberPhotometryRecording
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +166,7 @@ def _read_tev_store(
     return result
 
 
-class TdtFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
+class TdtFiberPhotometryExtractor(BaseFiberPhotometryRecording):
     """
     Extractor for TDT (Tucker-Davis Technologies) fiber photometry files.
 

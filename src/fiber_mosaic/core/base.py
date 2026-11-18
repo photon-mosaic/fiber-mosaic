@@ -4,7 +4,7 @@ Core classes for fiber photometry data handling.
 This module provides the base classes that form the foundation of fiber-mosaic:
 
 - FiberPhotometryMixin: The fiber-native API, mixable into any SI recording
-- BaseFiberPhotometryExtractor: A single named recording (wraps SI
+- BaseFiberPhotometryRecording: A single named recording (wraps SI
   BaseRecording)
 - FiberPhotometryRecordingGroup: Named recordings sharing fibers
 - recording_from_traces: General-purpose constructor for wrapping plain numpy
@@ -36,7 +36,7 @@ class FiberPhotometryMixin:
     - Channels are called "fibers"
     - `get_fluorescence()` wraps `get_traces()` with fiber-native naming
 
-    This is deliberately separate from BaseFiberPhotometryExtractor, which
+    This is deliberately separate from BaseFiberPhotometryRecording, which
     adds the source-side concerns (construction, stream discovery, segment
     loading). Keeping the API in a mixin lets recording-to-recording classes
     -- notably SpikeInterface preprocessors, which cannot inherit from an
@@ -120,7 +120,7 @@ class FiberPhotometryMixin:
         )
 
 
-class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
+class BaseFiberPhotometryRecording(FiberPhotometryMixin, BaseRecording):
     """
     Base class for fiber photometry recordings.
 
@@ -132,7 +132,7 @@ class BaseFiberPhotometryExtractor(FiberPhotometryMixin, BaseRecording):
     loading.
 
     Each channel in an experiment (e.g. signal and isosbestic) should be its
-    own BaseFiberPhotometryExtractor instance, grouped together via
+    own BaseFiberPhotometryRecording instance, grouped together via
     FiberPhotometryRecordingGroup.
 
     Parameters
@@ -368,7 +368,7 @@ class FiberPhotometryRecordingGroup:
     A container for multiple fiber photometry recordings sharing fibers.
 
     This class groups several named recordings
-    (BaseFiberPhotometryExtractor instances) that share the same fiber
+    (BaseFiberPhotometryRecording instances) that share the same fiber
     layout but may have different timebases or sample counts.
 
     This is NOT a BaseRecording because the recordings can have different
@@ -378,7 +378,7 @@ class FiberPhotometryRecordingGroup:
     ----------
     recordings : dict
         A dictionary mapping names to
-        BaseFiberPhotometryExtractor instances. All recordings must have
+        BaseFiberPhotometryRecording instances. All recordings must have
         identical fiber_ids in the same order.
 
     Examples
