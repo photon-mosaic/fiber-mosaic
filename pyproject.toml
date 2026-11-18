@@ -29,7 +29,11 @@ nwb = ['pynwb']
 # Plotting: matplotlib for static figures, ipywidgets + ipympl for the
 # interactive notebook backend (`%matplotlib widget`).
 widgets = ['ipympl', 'ipywidgets', 'matplotlib']
+# Robust baseline fit behind processing.dff. Pinned to a git branch until
+# aind-ophys-utils 0.3.0 is released (PyPI rejects direct references).
+dff = ['aind-ophys-utils @ git+https://github.com/AllenNeuralDynamics/aind-ophys-utils@integration/dev-plus-open-fixes']
 dev = [
+    'aind-ophys-utils @ git+https://github.com/AllenNeuralDynamics/aind-ophys-utils@integration/dev-plus-open-fixes',
     'coverage',
     'furo',
     'h5py',
