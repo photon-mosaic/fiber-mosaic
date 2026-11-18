@@ -20,7 +20,7 @@ from spikeinterface.preprocessing.preprocessing_classes import (
 )
 
 from fiber_mosaic.core.base import (
-    BaseFiberPhotometryExtractor,
+    BaseFiberPhotometryRecording,
     FiberPhotometryRecordingGroup,
 )
 from fiber_mosaic.processing import (
@@ -51,7 +51,7 @@ def _make_recording(
 ):
     """Build a recording, optionally with an explicit time vector."""
     sampling_frequency = 100.0
-    rec = BaseFiberPhotometryExtractor(
+    rec = BaseFiberPhotometryRecording(
         sampling_frequency=sampling_frequency,
         fiber_ids=list(fiber_ids),
         name=name,

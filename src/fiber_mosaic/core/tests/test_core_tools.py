@@ -7,7 +7,7 @@ import pytest
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 from fiber_mosaic.core.base import (
-    BaseFiberPhotometryExtractor,
+    BaseFiberPhotometryRecording,
     FiberPhotometryRecordingGroup,
 )
 from fiber_mosaic.core.core_tools import (
@@ -37,7 +37,7 @@ double = define_function_handling_group_from_class(_Doubler, "double")
 
 def _make_recording(name="green", fiber_ids=("f0", "f1")):
     """Build a small single-segment recording."""
-    rec = BaseFiberPhotometryExtractor(
+    rec = BaseFiberPhotometryRecording(
         sampling_frequency=100.0,
         fiber_ids=list(fiber_ids),
         name=name,

@@ -106,12 +106,38 @@ class FiberTracesWidget(TracesWidget):
             and len(recording) > 1
             and kwargs.get("color") is None
         )
+        self._scale = kwargs.get("scale", 1.0)
+        self._controls_synced = False
         TracesWidget.__init__(
             self, recording, vspacing_factor=vspacing_factor, **kwargs
         )
 
+    def plot_ipywidgets(self, data_plot, **backend_kwargs):
+        """Build upstream's controls on a window that exists in segment 0."""
+        start, end = data_plot["frame_range"]
+        data_plot = dict(data_plot, frame_range=(0, end - start))
+        TracesWidget.plot_ipywidgets(self, data_plot, **backend_kwargs)
+
+    def _retrieve_traces(self, change=None):
+        # Upstream draws once from controls it starts at segment 0, scale 1
+        # and a window of at most 30 s.
+        if not self._controls_synced:
+            self._controls_synced = True
+            slider = self.time_slider
+            start, end = (int(f) for f in self.data_plot["frame_range"])
+            duration = (end - start) / slider.sampling_frequency
+            slider.window_sizer.max = max(slider.window_sizer.max, duration)
+            slider.window_sizer.value = duration
+            self.scaler.value = self._scale
+            slider.value = (start, end, self.data_plot["segment_index"])
+        TracesWidget._retrieve_traces(self, change)
+
     def plot_matplotlib(self, data_plot, **backend_kwargs):
         """Draw with upstream's plotter, then apply fiber labels."""
+        # time_range selects frames on the nominal grid; events and the
+        # limits are in the recording's times.
+        times = data_plot["times_in_range"]
+        data_plot = dict(data_plot, time_range=(times[0], times[-1]))
         line_mode = data_plot["mode"] == "line"
         if line_mode:
             data_plot = self._for_display(data_plot)
@@ -540,10 +566,13 @@ def _overlay_colors(recordings: dict) -> list[str]:
 
 def _traces_kwargs(dp, draw: dict) -> dict:
     """Translate one draw into FiberTracesWidget's (upstream's) arguments."""
+    rec0 = next(iter(draw["layers"].values()))
     return dict(
         segment_index=dp.segment_index,
         channel_ids=dp.fiber_ids,
-        time_range=draw["time_range"],
+        time_range=_on_nominal_grid(
+            draw["time_range"], rec0, dp.segment_index
+        ),
         mode="line",
         show_channel_ids=dp.show_fiber_ids,
         center_traces=dp.center_traces,
@@ -646,17 +675,38 @@ def _clip(
     return time_range[0], min(time_range[1], t_end)
 
 
-def _has_samples(
+def _frames(
     time_range: Sequence[float], recording: BaseRecording, segment_index: int
-) -> bool:
-    """Return whether ``time_range``, clipped as drawn, selects any frame."""
+) -> tuple[int, int]:
+    """Return the frames ``time_range``, clipped as drawn, selects."""
     clipped = _clip(time_range, recording, segment_index)
     frames = [
         recording.time_to_sample_index(t, segment_index) for t in clipped
     ]
     n_frames = recording.get_num_samples(segment_index=segment_index)
     start, end = np.clip(frames, 0, n_frames)
-    return bool(start < end)
+    return int(start), int(end)
+
+
+def _has_samples(
+    time_range: Sequence[float], recording: BaseRecording, segment_index: int
+) -> bool:
+    """Return whether ``time_range``, clipped as drawn, selects any frame."""
+    start, end = _frames(time_range, recording, segment_index)
+    return start < end
+
+
+def _on_nominal_grid(
+    time_range: Sequence[float], recording: BaseRecording, segment_index: int
+) -> tuple[float, float]:
+    """Return times that upstream maps to the frames of ``time_range``.
+
+    Upstream assumes even sampling, which a pause in acquisition breaks.
+    """
+    t_start = recording.get_start_time(segment_index=segment_index)
+    fs = recording.get_sampling_frequency()
+    start, end = _frames(time_range, recording, segment_index)
+    return t_start + start / fs, t_start + end / fs
 
 
 def _center(traces: np.ndarray) -> np.ndarray:
@@ -690,17 +740,7 @@ def _shared_vspacing(
     """
     list_traces = []
     for recording in recordings:
-        n_frames = recording.get_num_samples(segment_index=segment_index)
-        start, end = (
-            int(
-                np.clip(
-                    recording.time_to_sample_index(t, segment_index),
-                    0,
-                    n_frames,
-                )
-            )
-            for t in time_range
-        )
+        start, end = _frames(time_range, recording, segment_index)
         traces = recording.get_traces(
             segment_index=segment_index,
             start_frame=start,

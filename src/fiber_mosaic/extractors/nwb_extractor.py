@@ -12,7 +12,7 @@ from typing import Any
 
 import numpy as np
 
-from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
+from fiber_mosaic.core.base import BaseFiberPhotometryRecording
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +152,7 @@ def _fiber_table_properties(series) -> dict[str, list]:
     return properties
 
 
-class NwbFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
+class NwbFiberPhotometryExtractor(BaseFiberPhotometryRecording):
     """
     Extractor for NWB fiber photometry files.
 
