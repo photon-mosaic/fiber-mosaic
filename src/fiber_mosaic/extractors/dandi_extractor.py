@@ -12,7 +12,7 @@ import logging
 import numpy as np
 from spikeinterface.core import BaseRecordingSegment
 
-from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
+from fiber_mosaic.core.base import BaseFiberPhotometryRecording
 from fiber_mosaic.extractors.nwb_extractor import (
     _discover_fiber_photometry_series,
     _fiber_table_properties,
@@ -265,7 +265,7 @@ class DandiRecordingSegment(BaseRecordingSegment):
         return raw.astype(self._dtype)
 
 
-class DandiFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
+class DandiFiberPhotometryExtractor(BaseFiberPhotometryRecording):
     """
     Extractor that streams fiber photometry data from the DANDI Archive.
 

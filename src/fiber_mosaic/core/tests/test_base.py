@@ -8,7 +8,7 @@ from spikeinterface.core import BaseRecording
 from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
 from fiber_mosaic.core.base import (
-    BaseFiberPhotometryExtractor,
+    BaseFiberPhotometryRecording,
     FiberPhotometryMixin,
     FiberPhotometryRecordingGroup,
     recording_from_traces,
@@ -23,7 +23,7 @@ def _make_recording(
     dtype="float32",
 ):
     """Build a single-segment recording with deterministic ramp traces."""
-    rec = BaseFiberPhotometryExtractor(
+    rec = BaseFiberPhotometryRecording(
         sampling_frequency=sampling_frequency,
         fiber_ids=list(fiber_ids),
         name=name,
@@ -58,7 +58,7 @@ def group():
     return grp, green, red
 
 
-# ---------------- BaseFiberPhotometryExtractor ----------------
+# ---------------- BaseFiberPhotometryRecording ----------------
 
 
 def test_construction_sets_color_and_fibers(recording):
@@ -117,7 +117,7 @@ def test_repr_includes_name_and_fiber_count(recording):
 
 def test_multi_segment():
     """Multiple segments are addressable via ``segment_index``."""
-    rec = BaseFiberPhotometryExtractor(
+    rec = BaseFiberPhotometryRecording(
         sampling_frequency=100.0,
         fiber_ids=["f0", "f1"],
         name="red",
@@ -150,7 +150,7 @@ class _PlainFiberRecording(FiberPhotometryMixin, BaseRecording):
 
     Mirrors what a SpikeInterface preprocessor looks like from the mixin's
     point of view: a plain ``BaseRecording`` that never runs
-    ``BaseFiberPhotometryExtractor.__init__``, so it sets its own name and
+    ``BaseFiberPhotometryRecording.__init__``, so it sets its own name and
     has none of the extractor's source-side machinery.
     """
 
@@ -189,7 +189,7 @@ def test_mixin_provides_fiber_api_off_a_plain_recording():
     """The fiber API works on a host that is not an extractor.
 
     This is the point of the split: a preprocessor cannot inherit from
-    BaseFiberPhotometryExtractor, so the fiber-native surface has to work
+    BaseFiberPhotometryRecording, so the fiber-native surface has to work
     when mixed into a plain BaseRecording.
     """
     rec, traces = _make_plain_recording()
@@ -211,7 +211,7 @@ def test_name_survives_copy_metadata(recording):
     preprocessor at all.
     """
     rec, _ = recording
-    other = BaseFiberPhotometryExtractor(
+    other = BaseFiberPhotometryRecording(
         sampling_frequency=rec.get_sampling_frequency(),
         fiber_ids=list(rec.get_channel_ids()),
         name="placeholder",

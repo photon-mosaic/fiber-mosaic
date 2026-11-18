@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from fiber_mosaic.core.base import BaseFiberPhotometryExtractor
+from fiber_mosaic.core.base import BaseFiberPhotometryRecording
 
 logger = logging.getLogger(__name__)
 
@@ -266,7 +266,7 @@ def _read_npm_data(
     return data_out, ts_out, sampling_rate
 
 
-class NpmFiberPhotometryExtractor(BaseFiberPhotometryExtractor):
+class NpmFiberPhotometryExtractor(BaseFiberPhotometryRecording):
     """
     Extractor for Neurophotometrics (NPM) fiber photometry files.
 

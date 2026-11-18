@@ -343,21 +343,21 @@ class TestCsvExtractor:
 # =============================================================================
 
 
-class TestBaseFiberPhotometryExtractor:
+class TestBaseFiberPhotometryRecording:
     """Tests for base extractor functionality."""
 
     def test_get_streams_not_implemented(self):
         """Test get_streams raises NotImplementedError on base class."""
-        from fiber_mosaic import BaseFiberPhotometryExtractor
+        from fiber_mosaic import BaseFiberPhotometryRecording
 
         with pytest.raises(NotImplementedError):
-            BaseFiberPhotometryExtractor.get_streams("/path")
+            BaseFiberPhotometryRecording.get_streams("/path")
 
     def test_get_fiber_ids(self):
         """Test get_fiber_ids method."""
-        from fiber_mosaic import BaseFiberPhotometryExtractor
+        from fiber_mosaic import BaseFiberPhotometryRecording
 
-        class TestExtractor(BaseFiberPhotometryExtractor):
+        class TestExtractor(BaseFiberPhotometryRecording):
             pass
 
         rec = TestExtractor(
@@ -381,7 +381,7 @@ class TestFiberPhotometryRecordingGroup:
         from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
         from fiber_mosaic import (
-            BaseFiberPhotometryExtractor,
+            BaseFiberPhotometryRecording,
             FiberPhotometryRecordingGroup,
         )
 
@@ -390,7 +390,7 @@ class TestFiberPhotometryRecordingGroup:
         sampling_rate = 100.0
         fiber_ids = ["NAc", "DMS"]
 
-        class TestExtractor(BaseFiberPhotometryExtractor):
+        class TestExtractor(BaseFiberPhotometryRecording):
             pass
 
         green = TestExtractor(
@@ -434,11 +434,11 @@ class TestFiberPhotometryRecordingGroup:
         from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
         from fiber_mosaic import (
-            BaseFiberPhotometryExtractor,
+            BaseFiberPhotometryRecording,
             FiberPhotometryRecordingGroup,
         )
 
-        class TestExtractor(BaseFiberPhotometryExtractor):
+        class TestExtractor(BaseFiberPhotometryRecording):
             pass
 
         rec1 = TestExtractor(
@@ -474,11 +474,11 @@ class TestFiberPhotometryRecordingGroup:
         from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
         from fiber_mosaic import (
-            BaseFiberPhotometryExtractor,
+            BaseFiberPhotometryRecording,
             FiberPhotometryRecordingGroup,
         )
 
-        class TestExtractor(BaseFiberPhotometryExtractor):
+        class TestExtractor(BaseFiberPhotometryRecording):
             pass
 
         rec = TestExtractor(
@@ -506,11 +506,11 @@ class TestFiberPhotometryRecordingGroup:
         from spikeinterface.core.numpyextractors import NumpyRecordingSegment
 
         from fiber_mosaic import (
-            BaseFiberPhotometryExtractor,
+            BaseFiberPhotometryRecording,
             FiberPhotometryRecordingGroup,
         )
 
-        class TestExtractor(BaseFiberPhotometryExtractor):
+        class TestExtractor(BaseFiberPhotometryRecording):
             pass
 
         rec = TestExtractor(

@@ -14,7 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from fiber_mosaic.core.base import (  # noqa: E402
-    BaseFiberPhotometryExtractor,
+    BaseFiberPhotometryRecording,
     FiberPhotometryRecordingGroup,
 )
 from fiber_mosaic.processing import zscore  # noqa: E402
@@ -34,9 +34,9 @@ def _make_recording(
     n_segments: int = 1,
     t_start: float | None = None,
     nan_samples: slice | None = None,
-) -> BaseFiberPhotometryExtractor:
+) -> BaseFiberPhotometryRecording:
     """Build a recording of slow sines on a large baseline, per fiber."""
-    recording = BaseFiberPhotometryExtractor(
+    recording = BaseFiberPhotometryRecording(
         sampling_frequency=FS,
         fiber_ids=[f"F{index}" for index in range(n_fibers)],
         name=name,
