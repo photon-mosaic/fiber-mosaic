@@ -107,6 +107,45 @@ class FiberPhotometryMixin:
             channel_ids=fiber_ids,
         )
 
+    def stages(self) -> dict[str, BaseRecording]:
+        """
+        Return this recording and what it was computed from, raw first.
+
+        Keys are step names as in ``processor_dict`` (``"raw"`` for the
+        input, ``"<step>_2"`` for a repeated step). Another recording a step
+        used, such as a baseline or a reference, comes before the step as
+        ``"<step>.<argument>"``.
+
+        Returns
+        -------
+        dict of str to BaseRecording
+            For ``dff`` then ``motion_correction``: ``"raw"``,
+            ``"dff.baseline_recording"``, ``"dff"``,
+            ``"motion_correction.reference_recording"`` and
+            ``"motion_correction"``.
+        """
+        from fiber_mosaic.processing import processor_dict  # avoids a cycle
+
+        parents = ("recording", "parent_recording")
+        chain = [self]
+        while any(key in chain[-1]._kwargs for key in parents):
+            key = next(key for key in parents if key in chain[-1]._kwargs)
+            chain.append(chain[-1]._kwargs[key])
+
+        stages = {"raw": chain.pop()}
+        for recording in reversed(chain):
+            function = processor_dict.get(type(recording).__name__)
+            step = function.__name__ if function else type(recording).__name__
+            name, count = step, 1
+            while name in stages:
+                count += 1
+                name = f"{step}_{count}"
+            for key, value in recording._kwargs.items():
+                if key not in parents and isinstance(value, BaseRecording):
+                    stages[f"{name}.{key}"] = value
+            stages[name] = recording
+        return stages
+
     def __repr__(self) -> str:
         """Return a one-line summary: class, name, fiber/segment count."""
         n_seg = self.get_num_segments()
