@@ -50,9 +50,9 @@ from fiber_mosaic.processing.from_spikeinterface import (
     scale,
     zscore,
 )
-from fiber_mosaic.processing.isosbestic_correction import (
-    IsosbesticCorrectionRecording,
-    isosbestic_correction,
+from fiber_mosaic.processing.motion_correction import (
+    MotionCorrectionRecording,
+    motion_correction,
 )
 
 _all_processer_dict = {
@@ -68,7 +68,7 @@ _all_processer_dict = {
     FiberCenterRecording: center,
     FiberZScoreRecording: zscore,
     # fiber-mosaic stuff
-    IsosbesticCorrectionRecording: isosbestic_correction,
+    MotionCorrectionRecording: motion_correction,
     FiberMultiExpBaselineRecording: multiexp_baseline,
     BaselineCorrectionRecording: baseline_correction,
     FiberDffRecording: dff,
