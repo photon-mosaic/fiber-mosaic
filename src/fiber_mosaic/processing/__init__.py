@@ -22,6 +22,14 @@ FiberPhotometryRecordingGroup, and returns the matching container:
 
 from __future__ import annotations
 
+from fiber_mosaic.processing.baseline import (
+    BaselineCorrectionRecording,
+    FiberDffRecording,
+    FiberMultiExpBaselineRecording,
+    baseline_correction,
+    dff,
+    multiexp_baseline,
+)
 from fiber_mosaic.processing.from_spikeinterface import (
     FiberBandpassFilterRecording,
     FiberCenterRecording,
@@ -61,6 +69,9 @@ _all_processer_dict = {
     FiberZScoreRecording: zscore,
     # fiber-mosaic stuff
     IsosbesticCorrectionRecording: isosbestic_correction,
+    FiberMultiExpBaselineRecording: multiexp_baseline,
+    BaselineCorrectionRecording: baseline_correction,
+    FiberDffRecording: dff,
 }
 # we control import in the preprocessing init by setting an __all__
 
